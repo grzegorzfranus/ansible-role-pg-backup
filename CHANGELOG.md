@@ -5,13 +5,35 @@ All notable changes to this Ansible role will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-12-05
+
+### Added ✅
+
+- Added Debian 11 (Bullseye) as officially supported platform
+- Dynamic molecule configuration using `MOLECULE_DISTRO` environment variable
+
+### Changed 🔄
+
+- Removed Rocky Linux 9 from CI test matrix (Debian/Ubuntu only support)
+- Added ansible-lint to CI pipeline
+- Replaced `community.postgresql` modules with native `psql` commands in prepare.yml
+
+### Fixed 🔧
+
+- Fixed molecule converge.yml `until` condition syntax for Ansible 2.20 compatibility
+- Fixed molecule.yml to properly use `MOLECULE_DISTRO` environment variable
+- Fixed role reference in converge.yml using `MOLECULE_PROJECT_DIRECTORY` lookup
+- Fixed syntax check failures by removing external collection dependencies
+
+---
+
 ## [1.0.0] - 2025-12-04
 
 ### Added ✅
 
 #### Molecule Testing
 - Complete Molecule test suite for role validation
-- Test scenarios for Ubuntu 24.04 (compatible with Ansible 2.20)
+- Test scenarios for Ubuntu 22.04, Ubuntu 24.04, Debian 11, and Debian 12
 - Automated PostgreSQL installation in test environment
 - Comprehensive verification tests:
   - Script installation and permissions
@@ -118,4 +140,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Quality
 - Variable validation with `assert.yml`
 - Proper file permissions throughout
-- Support for Ubuntu 22.04, 24.04 and Debian 12
+- Support for Ubuntu 22.04, 24.04, Debian 11, and Debian 12

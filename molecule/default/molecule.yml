@@ -4,6 +4,12 @@
 # =============================================================================
 # This file configures Molecule for testing the PostgreSQL backup role.
 # Tests run on Ubuntu/Debian containers with PostgreSQL pre-installed.
+#
+# Supported distributions (via MOLECULE_DISTRO env var):
+#   - ubuntu2204 (Ubuntu 22.04 LTS)
+#   - ubuntu2404 (Ubuntu 24.04 LTS)
+#   - debian11 (Debian 11 Bullseye)
+#   - debian12 (Debian 12 Bookworm)
 # =============================================================================
 
 dependency:
@@ -15,8 +21,8 @@ driver:
   name: docker
 
 platforms:
-  - name: pg-backup-ubuntu2404
-    image: "geerlingguy/docker-ubuntu2404-ansible:latest"
+  - name: pg-backup-${MOLECULE_DISTRO:-ubuntu2404}
+    image: "geerlingguy/docker-${MOLECULE_DISTRO:-ubuntu2404}-ansible:latest"
     command: ${MOLECULE_DOCKER_COMMAND:-""}
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw

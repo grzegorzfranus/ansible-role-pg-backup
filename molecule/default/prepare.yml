@@ -71,32 +71,39 @@
     - name: Prepare | Set postgres user password
       become: true
       become_user: postgres
-      community.postgresql.postgresql_user:
-        name: postgres
-        password: "{{ pg_test_password }}"
-        state: present
+      ansible.builtin.command:
+        cmd: psql -c "ALTER USER postgres WITH PASSWORD '{{ pg_test_password }}';"
+      changed_when: true
       no_log: true
 
     - name: Prepare | Create test databases
       become: true
       become_user: postgres
-      community.postgresql.postgresql_db:
-        name: "{{ item }}"
-        state: present
+      ansible.builtin.command:
+        cmd: createdb {{ item }}
       loop: "{{ pg_test_databases }}"
+      register: create_db_result
+      changed_when: create_db_result.rc == 0
+      failed_when: create_db_result.rc != 0 and 'already exists' not in create_db_result.stderr
 
     - name: Prepare | Create test table in testdb1
       become: true
       become_user: postgres
-      community.postgresql.postgresql_query:
-        db: testdb1
-        query: |
-          CREATE TABLE IF NOT EXISTS test_table (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(100),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          );
-          INSERT INTO test_table (name) VALUES ('test_row_1'), ('test_row_2');
+      ansible.builtin.shell:
+        cmd: |
+          psql -d testdb1 -c "
+            CREATE TABLE IF NOT EXISTS test_table (
+              id SERIAL PRIMARY KEY,
+              name VARCHAR(100),
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+          "
+          psql -d testdb1 -c "
+            INSERT INTO test_table (name)
+            SELECT 'test_row_' || generate_series(1, 5)
+            WHERE NOT EXISTS (SELECT 1 FROM test_table LIMIT 1);
+          "
+      changed_when: true
 
     # -------------------------------------------------------------------------
     # 5. Configure .pgpass for Testing

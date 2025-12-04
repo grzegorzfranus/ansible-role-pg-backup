@@ -42,6 +42,7 @@ pg_backup_supported_ubuntu_versions:
 # Supported Debian versions for this role
 # Only stable versions are officially supported
 pg_backup_supported_debian_versions:
+  - "11"     # Debian 11 (Bullseye)
   - "12"     # Debian 12 (Bookworm)
 
 # -----------------------------------------------------------------------------
@@ -50,7 +51,7 @@ pg_backup_supported_debian_versions:
 # Backup script version and configuration.
 
 # Backup script version (updated when script template changes)
-pg_backup_script_version: "1.0.0"
+pg_backup_script_version: "1.0.1"
 
 # Script name for logging purposes
 pg_backup_script_name: "pg_backup.sh"
