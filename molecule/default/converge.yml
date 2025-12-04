@@ -51,4 +51,4 @@
       failed_when: false
 
   roles:
-    - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | default(playbook_dir + '/../..', true) }}"
+    - role: ansible-role-pg-backup

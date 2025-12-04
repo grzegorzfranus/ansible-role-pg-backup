@@ -42,6 +42,7 @@ provisioner:
       gathering: smart
       fact_caching: jsonfile
       fact_caching_connection: /tmp/ansible_facts
+      roles_path: "${MOLECULE_PROJECT_DIRECTORY}/..:${MOLECULE_EPHEMERAL_DIRECTORY}/roles"
     ssh_connection:
       pipelining: true
   env:
