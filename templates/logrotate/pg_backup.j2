@@ -1,0 +1,44 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+{{ ansible_managed | comment }}
+
+# Log rotation configuration for PostgreSQL Backup service
+# This template manages the rotation of backup log files to prevent disk space issues
+# and maintain organized log archives.
+
+# Define log files to rotate
+{{ pg_backup_log_file }}
+{{ pg_backup_cron_log_file }} {
+  # Rotation frequency (daily, weekly, monthly)
+  {{ pg_backup_logrotate_options['frequency'] }}
+  {% if pg_backup_logrotate_options['missingok'] %}
+  # Don't error if log file is missing
+  missingok
+  {% endif %}
+  # Number of rotated files to keep
+  rotate {{ pg_backup_logrotate_options['count'] }}
+  {% if pg_backup_logrotate_options['compress'] %}
+  # Compress rotated log files
+  compress
+  {% endif %}
+  {% if pg_backup_logrotate_options['delaycompress'] %}
+  # Delay compression until next rotation cycle
+  delaycompress
+  {% endif %}
+  {% if pg_backup_logrotate_options['notifempty'] %}
+  # Don't rotate if log file is empty
+  notifempty
+  {% endif %}
+  {% if pg_backup_logrotate_options['create'] %}
+  # Create new log file after rotation with specified permissions
+  create {{ pg_backup_logrotate_options['create_mode'] }} {{ pg_backup_logrotate_options['create_owner'] }} {{ pg_backup_logrotate_options['create_group'] }}
+  {% endif %}
+  {% if pg_backup_logrotate_options['dateext'] %}
+  # Add date to name of archive log files
+  dateext
+  dateformat .%Y-%m-%d
+  {% endif %}
+  {% if pg_backup_logrotate_options['archive_directory_path'] is defined %}
+  # Archive log directory path
+  olddir {{ pg_backup_logrotate_options['archive_directory_path'] }}
+  {% endif %}
+}

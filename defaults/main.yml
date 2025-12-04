@@ -1,0 +1,206 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Default Variables
+# =============================================================================
+# This file defines default configuration values for PostgreSQL database backup.
+# These values can be overridden by setting them in your playbook or inventory.
+#
+# SECURITY PRIORITY: This configuration focuses on secure backup operations
+# with proper file permissions, credential management via .pgpass, and
+# comprehensive logging for audit purposes.
+#
+# Sections:
+#   1. General Settings
+#   2. PostgreSQL Connection Settings
+#   3. Backup Settings
+#   4. Retention Settings
+#   5. Logging Configuration
+#   6. Cron Schedule Settings
+#   7. Script Timeout Settings
+#   8. Logrotate Configuration
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. General Settings
+# -----------------------------------------------------------------------------
+# Role execution control and basic service configuration.
+
+# Define which parts of the role to execute (Options: 'all', 'install', 'configure')
+# - 'all': Execute complete role (install + configure + cron)
+# - 'install': Only install backup script and dependencies
+# - 'configure': Only configure backup settings (assumes script already installed)
+pg_backup_role_action: "all"
+
+# Enable/disable the backup cron job
+# Set to false if you want to run backups manually or via external scheduler
+pg_backup_cron_enabled: true
+
+# User that will run the backup script and own related files
+# Should have access to PostgreSQL (typically 'postgres')
+pg_backup_user: "postgres"
+
+# Group for backup files and directories
+pg_backup_group: "postgres"
+
+# -----------------------------------------------------------------------------
+# 2. PostgreSQL Connection Settings
+# -----------------------------------------------------------------------------
+# Connection parameters for PostgreSQL server.
+
+# PostgreSQL server hostname or IP address
+# Use 'localhost' for local socket connections or IP for network connections
+pg_backup_pg_host: "localhost"
+
+# PostgreSQL server port
+# Default PostgreSQL port is 5432
+pg_backup_pg_port: 5432
+
+# PostgreSQL username for backup operations
+# This user must have read access to all databases
+# SECURITY: Use a dedicated backup user with minimal privileges
+pg_backup_pg_user: "postgres"
+
+# PostgreSQL password for backup user
+# SECURITY: Use Ansible Vault to encrypt this value!
+# If empty, assumes .pgpass is already configured or peer authentication
+pg_backup_pg_password: ""
+
+# Configure .pgpass file for password authentication
+# Set to true to automatically create/update .pgpass file
+pg_backup_configure_pgpass: true
+
+# .pgpass file permissions (must be 0600 for security)
+pg_backup_pgpass_mode: "0600"
+
+# -----------------------------------------------------------------------------
+# 3. Backup Settings
+# -----------------------------------------------------------------------------
+# Backup format, compression, and storage configuration.
+
+# Directory where backups will be stored
+# Subdirectories will be created for each date (YYYY-MM-DD)
+pg_backup_dir: "/var/backups/postgresql"
+
+# Directory permissions for backup directory
+pg_backup_dir_mode: "0750"
+
+# Backup file permissions (contains sensitive data)
+pg_backup_file_mode: "0600"
+
+# Compression level for pg_dump (0-9)
+# 0 = no compression, 9 = maximum compression
+# Higher values = smaller files but slower backups
+# Recommended: 6 (good balance between size and speed)
+pg_backup_compression_level: 6
+
+# Path where the backup script will be installed
+pg_backup_script_path: "/usr/local/bin/pg_backup.sh"
+
+# Script file permissions (executable by owner)
+pg_backup_script_mode: "0750"
+
+# List of databases to exclude from backup
+# Default: PostgreSQL system/template databases
+# Add your databases here if you don't want them backed up
+pg_backup_exclude_databases:
+  - "template0"
+  - "template1"
+
+# -----------------------------------------------------------------------------
+# 4. Retention Settings
+# -----------------------------------------------------------------------------
+# Automatic cleanup of old backups.
+
+# Number of days to keep backups
+# Backups older than this will be automatically deleted
+# Minimum recommended: 7 days
+pg_backup_retention_days: 7
+
+# -----------------------------------------------------------------------------
+# 5. Logging Configuration
+# -----------------------------------------------------------------------------
+# Centralized logging and log file management.
+
+# Enable dedicated logging for backup operations
+pg_backup_enable_logging: true
+
+# Directory for backup log files
+pg_backup_log_dir: "/var/log/postgresql"
+
+# Log directory permissions
+pg_backup_log_dir_mode: "0755"
+
+# Main backup log file path
+pg_backup_log_file: "{{ pg_backup_log_dir }}/pg_backup.log"
+
+# Log file permissions
+pg_backup_log_file_mode: "0640"
+
+# -----------------------------------------------------------------------------
+# 6. Cron Schedule Settings
+# -----------------------------------------------------------------------------
+# Automatic backup scheduling configuration.
+
+# Cron job name for identification
+pg_backup_cron_name: "PostgreSQL Daily Backup"
+
+# Backup schedule (cron format)
+# Default: Daily at 2:00 AM
+pg_backup_cron_minute: "0"
+pg_backup_cron_hour: "2"
+pg_backup_cron_day: "*"
+pg_backup_cron_month: "*"
+pg_backup_cron_weekday: "*"
+
+# Additional cron job for logging (redirects output)
+pg_backup_cron_log_file: "{{ pg_backup_log_dir }}/pg_backup_cron.log"
+
+# -----------------------------------------------------------------------------
+# 7. Script Timeout Settings
+# -----------------------------------------------------------------------------
+# Timeout configurations to prevent hanging operations.
+
+# Maximum time to wait for table locks during backup (seconds)
+# If exceeded, the backup for that database will fail gracefully
+# This prevents indefinite hangs on locked tables
+# Range: 60-1800 (1-30 minutes)
+pg_backup_lock_wait_timeout: 300
+
+# Connection timeout for initial PostgreSQL connection check (seconds)
+# Range: 10-120
+pg_backup_connection_timeout: 30
+
+# -----------------------------------------------------------------------------
+# 8. Logrotate Configuration
+# -----------------------------------------------------------------------------
+# Automatic log rotation settings using logrotate.
+
+# Enable logrotate configuration for backup logs
+pg_backup_configure_logrotate: true
+
+# Logrotate configuration options
+pg_backup_logrotate_options:
+  # Rotation frequency (options: hourly, daily, weekly, monthly)
+  frequency: "daily"
+  # Number of rotated log files to retain
+  count: 14
+  # Don't generate error if log file is missing
+  missingok: true
+  # Skip rotation if log file is empty
+  notifempty: true
+  # Compress rotated logs with gzip
+  compress: true
+  # Delay compression until next rotation cycle
+  delaycompress: true
+  # Create new empty log file after rotation
+  create: true
+  # File permissions for newly created log file
+  create_mode: "0640"
+  # Owner of newly created log file
+  create_owner: "{{ pg_backup_user }}"
+  # Group of newly created log file
+  create_group: "{{ pg_backup_group }}"
+  # Add date extension to rotated log files
+  dateext: true
+  # Directory for archived logs
+  archive_directory_path: "{{ pg_backup_log_dir }}/archived"

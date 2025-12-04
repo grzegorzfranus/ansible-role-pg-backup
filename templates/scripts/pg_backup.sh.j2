@@ -1,0 +1,809 @@
+#!/bin/bash
+#===============================================================================
+# PostgreSQL Database Backup Script
+#===============================================================================
+# Description: Professional backup script for PostgreSQL databases
+# Version:     {{ pg_backup_script_version }}
+# Managed by:  Ansible
+#
+# Features:
+#   - Dumps all databases in custom format (-Fc) for easy restore
+#   - Comprehensive logging with timestamps and log levels
+#   - Pre-flight validation checks
+#   - Automatic retention management
+#   - Checksum verification
+#   - Lock timeout handling
+#
+# WARNING: This file is managed by Ansible - do not edit manually!
+#
+#===============================================================================
+# RESTORE INSTRUCTIONS:
+#===============================================================================
+#
+# IMPORTANT: Always restore global objects (roles/users) BEFORE restoring databases!
+# Otherwise, database ownership and permissions will fail.
+#
+# STEP 1: Restore global objects (roles, tablespaces) - REQUIRED FIRST:
+#   psql -h {{ pg_backup_pg_host }} -U {{ pg_backup_pg_user }} -f globals_YYYY-MM-DD_HHMMSS.sql
+#
+# STEP 2: Restore database(s):
+#
+#   To restore a single database:
+#   pg_restore -h {{ pg_backup_pg_host }} -U {{ pg_backup_pg_user }} -d <database_name> -v <backup_file.dump>
+#
+#   To restore to a new database:
+#   createdb -h {{ pg_backup_pg_host }} -U {{ pg_backup_pg_user }} <new_database_name>
+#   pg_restore -h {{ pg_backup_pg_host }} -U {{ pg_backup_pg_user }} -d <new_database_name> -v <backup_file.dump>
+#
+#   To restore with clean (drop existing objects first):
+#   pg_restore -h {{ pg_backup_pg_host }} -U {{ pg_backup_pg_user }} -d <database_name> -c -v <backup_file.dump>
+#
+#   To restore in parallel (faster for large databases):
+#   pg_restore -h {{ pg_backup_pg_host }} -U {{ pg_backup_pg_user }} -d <database_name> -j 4 -v <backup_file.dump>
+#
+# ADDITIONAL COMMANDS:
+#
+#   List contents of backup without restoring:
+#   pg_restore -l <backup_file.dump>
+#
+#   Restore specific tables only:
+#   pg_restore -h {{ pg_backup_pg_host }} -U {{ pg_backup_pg_user }} -d <database_name> -t <table_name> <backup_file.dump>
+#
+#===============================================================================
+
+set -euo pipefail
+
+#===============================================================================
+# CONFIGURATION (Managed by Ansible)
+#===============================================================================
+
+# PostgreSQL connection settings
+readonly PG_HOST="{{ pg_backup_pg_host }}"
+readonly PG_PORT="{{ pg_backup_pg_port }}"
+readonly PG_USER="{{ pg_backup_pg_user }}"
+
+# Backup settings
+readonly BACKUP_DIR="{{ pg_backup_dir }}"
+readonly BACKUP_RETENTION_DAYS="{{ pg_backup_retention_days }}"
+readonly BACKUP_COMPRESSION_LEVEL="{{ pg_backup_compression_level }}"
+
+# Databases to exclude from backup
+readonly EXCLUDE_DATABASES=({% for db in pg_backup_exclude_databases %}"{{ db }}" {% endfor %})
+
+# Logging settings
+readonly LOG_DIR="{{ pg_backup_log_dir }}"
+readonly LOG_FILE="{{ pg_backup_log_file }}"
+
+# Timeout settings (in seconds)
+readonly LOCK_WAIT_TIMEOUT="{{ pg_backup_lock_wait_timeout }}"
+readonly CONNECTION_TIMEOUT="{{ pg_backup_connection_timeout }}"
+
+# Script metadata
+readonly SCRIPT_NAME="$(basename "$0")"
+readonly SCRIPT_VERSION="{{ pg_backup_script_version }}"
+readonly TIMESTAMP="$(date +%Y-%m-%d_%H%M%S)"
+readonly DATE_STAMP="$(date +%Y-%m-%d)"
+
+# Runtime variables
+BACKUP_SUCCESS_COUNT=0
+BACKUP_FAILURE_COUNT=0
+BACKUP_START_TIME=""
+DATABASES_TO_BACKUP=()
+
+#===============================================================================
+# LOGGING FUNCTIONS
+#===============================================================================
+
+# Initialize logging
+init_logging() {
+    # Create log directory if not exists
+    if [[ ! -d "$LOG_DIR" ]]; then
+        mkdir -p "$LOG_DIR" || {
+            echo "ERROR: Cannot create log directory: $LOG_DIR" >&2
+            exit 1
+        }
+    fi
+
+    # Ensure log file exists with proper permissions
+    # Note: Log rotation is handled by logrotate, not by this script
+    touch "$LOG_FILE"
+    chmod 640 "$LOG_FILE"
+}
+
+# Log message with timestamp and level
+# Format follows syslog-style best practices: TIMESTAMP LEVEL COMPONENT MESSAGE
+log() {
+    local level="$1"
+    local message="$2"
+    local timestamp
+    timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    
+    # Pad level to 8 chars for alignment
+    local level_padded
+    level_padded=$(printf '%-8s' "$level")
+    
+    # Format: TIMESTAMP | LEVEL | COMPONENT | MESSAGE
+    local log_entry="${timestamp} | ${level_padded} | ${SCRIPT_NAME} | ${message}"
+    
+    # Write to log file
+    echo "$log_entry" >> "$LOG_FILE"
+    
+    # Also output to console based on level
+    case "$level" in
+        ERROR|CRITICAL)
+            echo "$log_entry" >&2
+            ;;
+        INFO|SUCCESS|WARNING)
+            echo "$log_entry"
+            ;;
+        DEBUG)
+            # Only output DEBUG if verbose mode is enabled
+            [[ "${VERBOSE:-false}" == "true" ]] && echo "$log_entry"
+            ;;
+    esac
+}
+
+# Log a raw line (for banners)
+log_raw() {
+    local message="$1"
+    echo "$message" >> "$LOG_FILE"
+    echo "$message"
+}
+
+# Print a separator line
+log_separator() {
+    log_raw "--------------------------------------------------------------------------------"
+}
+
+# Print double separator line
+log_double_separator() {
+    log_raw "================================================================================"
+}
+
+# Log script start banner
+log_start_banner() {
+    log_raw ""
+    log_double_separator
+    log_raw "   ____   ____   ____    _    ____ _  ___   _ ____  "
+    log_raw "  |  _ \\ / ___| | __ )  / \\  / ___| |/ / | | |  _ \\ "
+    log_raw "  | |_) | |  _  |  _ \\ / _ \\| |   | ' /| | | | |_) |"
+    log_raw "  |  __/| |_| | | |_) / ___ \\ |___| . \\| |_| |  __/ "
+    log_raw "  |_|    \\____| |____/_/   \\_\\____|_|\\_\\\\___/|_|    "
+    log_raw ""
+    log_raw "  PostgreSQL Backup Script v${SCRIPT_VERSION}"
+    log_raw "  Started: $(date '+%Y-%m-%d %H:%M:%S')"
+    log_double_separator
+    log_raw ""
+}
+
+# Log script end banner
+log_end_banner() {
+    local status="$1"
+    local duration="$2"
+    local exit_code="$3"
+    
+    log_raw ""
+    log_double_separator
+    if [[ "$status" == "SUCCESS" ]]; then
+        log_raw "  BACKUP COMPLETED SUCCESSFULLY"
+    elif [[ "$status" == "PARTIAL" ]]; then
+        log_raw "  BACKUP COMPLETED WITH ERRORS"
+    else
+        log_raw "  BACKUP FAILED"
+    fi
+    log_double_separator
+    log_raw "  End time:       $(date '+%Y-%m-%d %H:%M:%S')"
+    log_raw "  Duration:       $duration"
+    log_raw "  Exit code:      $exit_code"
+    if [[ -n "${BACKUP_SUCCESS_COUNT:-}" ]]; then
+        log_raw "  DBs successful: $BACKUP_SUCCESS_COUNT"
+        log_raw "  DBs failed:     $BACKUP_FAILURE_COUNT"
+    fi
+    log_double_separator
+    log_raw ""
+}
+
+#===============================================================================
+# UTILITY FUNCTIONS
+#===============================================================================
+
+# Display usage information
+usage() {
+    cat << EOF
+Usage: ${SCRIPT_NAME} [OPTIONS]
+
+PostgreSQL Database Backup Script v${SCRIPT_VERSION}
+
+Options:
+    -h, --help              Show this help message
+    -v, --verbose           Enable verbose output
+    -d, --dry-run           Simulate backup without executing
+    -D, --database DB       Backup specific database only
+
+Examples:
+    ${SCRIPT_NAME}                          # Run with defaults
+    ${SCRIPT_NAME} -v                       # Verbose mode
+    ${SCRIPT_NAME} -d                       # Dry run
+    ${SCRIPT_NAME} -D mydb                  # Backup specific database
+
+EOF
+    exit 0
+}
+
+# Parse command line arguments
+parse_arguments() {
+    VERBOSE="${VERBOSE:-false}"
+    DRY_RUN="${DRY_RUN:-false}"
+    SPECIFIC_DATABASE=""
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                usage
+                ;;
+            -v|--verbose)
+                VERBOSE="true"
+                shift
+                ;;
+            -d|--dry-run)
+                DRY_RUN="true"
+                shift
+                ;;
+            -D|--database)
+                SPECIFIC_DATABASE="$2"
+                shift 2
+                ;;
+            *)
+                log "ERROR" "Unknown option: $1"
+                usage
+                ;;
+        esac
+    done
+}
+
+# Convert seconds to human-readable format
+seconds_to_human() {
+    local seconds="$1"
+    local hours=$((seconds / 3600))
+    local minutes=$(((seconds % 3600) / 60))
+    local secs=$((seconds % 60))
+    
+    if [[ $hours -gt 0 ]]; then
+        printf "%dh %dm %ds" "$hours" "$minutes" "$secs"
+    elif [[ $minutes -gt 0 ]]; then
+        printf "%dm %ds" "$minutes" "$secs"
+    else
+        printf "%ds" "$secs"
+    fi
+}
+
+# Get file size in human-readable format
+get_file_size() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        du -h "$file" | cut -f1
+    else
+        echo "0"
+    fi
+}
+
+#===============================================================================
+# VALIDATION FUNCTIONS
+#===============================================================================
+
+# Check if required commands are available
+check_required_commands() {
+    log "INFO" "Checking required commands..."
+    
+    local required_commands=(
+        "pg_dump"
+        "pg_dumpall"
+        "psql"
+        "pg_isready"
+    )
+    
+    local missing_commands=()
+    
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" &> /dev/null; then
+            missing_commands+=("$cmd")
+        else
+            local cmd_path
+            cmd_path=$(command -v "$cmd")
+            log "DEBUG" "Found command: $cmd at $cmd_path"
+        fi
+    done
+    
+    if [[ ${{ '{#' }}missing_commands[@]} -gt 0 ]]; then
+        log "CRITICAL" "Missing required commands: ${missing_commands[*]}"
+        log "CRITICAL" "Please install PostgreSQL client tools"
+        return 1
+    fi
+    
+    # Log PostgreSQL client version
+    local pg_version
+    pg_version=$(pg_dump --version | head -n1)
+    log "INFO" "PostgreSQL client: $pg_version"
+    
+    return 0
+}
+
+# Check PostgreSQL connection
+check_pg_connection() {
+    log "INFO" "Checking PostgreSQL connection..."
+    
+    # Use pg_isready for quick connection check
+    if ! pg_isready -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -t "$CONNECTION_TIMEOUT" &> /dev/null; then
+        log "CRITICAL" "Cannot connect to PostgreSQL at ${PG_HOST}:${PG_PORT}"
+        log "CRITICAL" "Please check: 1) PostgreSQL is running, 2) Network access, 3) .pgpass file"
+        return 1
+    fi
+    
+    log "INFO" "PostgreSQL connection successful"
+    
+    # Get server version
+    local server_version
+    server_version=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -t -c "SELECT version();" 2>/dev/null | head -n1 | xargs)
+    log "INFO" "PostgreSQL server: $server_version"
+    
+    return 0
+}
+
+# Check .pgpass file exists and has proper permissions
+check_pgpass() {
+    log "INFO" "Checking .pgpass authentication..."
+    
+    local pgpass_file="${HOME}/.pgpass"
+    
+    if [[ ! -f "$pgpass_file" ]]; then
+        log "ERROR" ".pgpass file not found at: $pgpass_file"
+        log "ERROR" "Create .pgpass file with format: hostname:port:database:username:password"
+        log "ERROR" "Example: localhost:5432:*:postgres:yourpassword"
+        return 1
+    fi
+    
+    # Check permissions (must be 600 or 400)
+    local pgpass_perms
+    pgpass_perms=$(stat -c "%a" "$pgpass_file" 2>/dev/null || stat -f "%Lp" "$pgpass_file" 2>/dev/null)
+    
+    if [[ "$pgpass_perms" != "600" && "$pgpass_perms" != "400" ]]; then
+        log "ERROR" ".pgpass file has insecure permissions: $pgpass_perms (should be 600)"
+        log "ERROR" "Fix with: chmod 600 $pgpass_file"
+        return 1
+    fi
+    
+    log "INFO" ".pgpass file configured correctly"
+    return 0
+}
+
+# Check backup directory
+check_backup_directory() {
+    log "INFO" "Checking backup directory..."
+    
+    # Create backup directory if not exists
+    if [[ ! -d "$BACKUP_DIR" ]]; then
+        log "INFO" "Creating backup directory: $BACKUP_DIR"
+        if ! mkdir -p "$BACKUP_DIR"; then
+            log "CRITICAL" "Cannot create backup directory: $BACKUP_DIR"
+            return 1
+        fi
+    fi
+    
+    # Check write permissions
+    if [[ ! -w "$BACKUP_DIR" ]]; then
+        log "CRITICAL" "Backup directory is not writable: $BACKUP_DIR"
+        return 1
+    fi
+    
+    # Create dated subdirectory
+    local dated_dir="${BACKUP_DIR}/${DATE_STAMP}"
+    if [[ ! -d "$dated_dir" ]]; then
+        mkdir -p "$dated_dir"
+        log "DEBUG" "Created dated backup directory: $dated_dir"
+    fi
+    
+    log "INFO" "Backup directory ready: $BACKUP_DIR"
+    return 0
+}
+
+# Check available disk space
+check_disk_space() {
+    log "INFO" "Checking available disk space..."
+    
+    # Get available space in KB
+    local available_kb
+    available_kb=$(df -k "$BACKUP_DIR" | tail -1 | awk '{print $4}')
+    
+    # Convert to human readable
+    local available_human
+    available_human=$(df -h "$BACKUP_DIR" | tail -1 | awk '{print $4}')
+    
+    # Get current database sizes
+    local total_db_size
+    total_db_size=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -t -c \
+        "SELECT pg_size_pretty(SUM(pg_database_size(datname))) FROM pg_database WHERE datistemplate = false;" 2>/dev/null | xargs)
+    
+    log "INFO" "Available disk space: $available_human"
+    log "INFO" "Total database size: ${total_db_size:-unknown}"
+    
+    # Warn if less than 10GB available
+    if [[ $available_kb -lt 10485760 ]]; then
+        log "WARNING" "Low disk space warning: only $available_human available"
+    fi
+    
+    # Fail if less than 1GB available
+    if [[ $available_kb -lt 1048576 ]]; then
+        log "CRITICAL" "Insufficient disk space: only $available_human available (minimum 1GB required)"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Run all pre-flight checks
+run_preflight_checks() {
+    log_separator
+    log "INFO" "Starting pre-flight checks..."
+    
+    # Check 1: Required commands must be available
+    if ! check_required_commands; then
+        log "CRITICAL" "Pre-flight check FAILED: Required commands not available"
+        return 1
+    fi
+    
+    # Check 2: .pgpass file must exist with proper permissions
+    if ! check_pgpass; then
+        log "CRITICAL" "Pre-flight check FAILED: .pgpass authentication not configured"
+        return 1
+    fi
+    
+    # Check 3: PostgreSQL connection must work (CRITICAL - stop immediately if no connection)
+    if ! check_pg_connection; then
+        log "CRITICAL" "Pre-flight check FAILED: Cannot connect to PostgreSQL"
+        log "CRITICAL" "Backup process ABORTED - fix PostgreSQL connectivity first"
+        return 1
+    fi
+    
+    # Check 4: Backup directory must be writable
+    if ! check_backup_directory; then
+        log "CRITICAL" "Pre-flight check FAILED: Backup directory not accessible"
+        return 1
+    fi
+    
+    # Check 5: Sufficient disk space required
+    if ! check_disk_space; then
+        log "CRITICAL" "Pre-flight check FAILED: Insufficient disk space"
+        return 1
+    fi
+    
+    log "SUCCESS" "All pre-flight checks passed"
+    log_separator
+    return 0
+}
+
+#===============================================================================
+# BACKUP FUNCTIONS
+#===============================================================================
+
+# Get list of databases to backup
+# Check if database is in exclusion list
+is_excluded() {
+    local db="$1"
+    for excluded in "${EXCLUDE_DATABASES[@]}"; do
+        if [[ "$db" == "$excluded" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+get_databases() {
+    log "INFO" "Retrieving list of databases..."
+    
+    local db_query="SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;"
+    local excluded_count=0
+    
+    # Log excluded databases if any
+    if [[ ${{ '{#' }}EXCLUDE_DATABASES[@]} -gt 0 ]]; then
+        log "INFO" "Excluded databases: ${EXCLUDE_DATABASES[*]}"
+    fi
+    
+    # Read databases into array, filtering out excluded ones
+    while IFS= read -r db; do
+        # Trim whitespace
+        db=$(echo "$db" | xargs)
+        if [[ -n "$db" ]]; then
+            if is_excluded "$db"; then
+                log "DEBUG" "Skipping excluded database: $db"
+                ((excluded_count++))
+            else
+                DATABASES_TO_BACKUP+=("$db")
+            fi
+        fi
+    done < <(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -t -c "$db_query" 2>/dev/null)
+    
+    if [[ ${{ '{#' }}DATABASES_TO_BACKUP[@]} -eq 0 ]]; then
+        log "ERROR" "No databases found to backup (excluded: $excluded_count)"
+        return 1
+    fi
+    
+    log "INFO" "Found ${{ '{#' }}DATABASES_TO_BACKUP[@]} database(s) to backup: ${DATABASES_TO_BACKUP[*]}"
+    if [[ $excluded_count -gt 0 ]]; then
+        log "INFO" "Excluded $excluded_count database(s) from backup"
+    fi
+    return 0
+}
+
+# Backup global objects (roles, tablespaces)
+backup_globals() {
+    log "INFO" "Backing up global objects (roles, tablespaces)..."
+    
+    local globals_file="${BACKUP_DIR}/${DATE_STAMP}/globals_${TIMESTAMP}.sql"
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "INFO" "[DRY-RUN] Would backup globals to: $globals_file"
+        return 0
+    fi
+    
+    if pg_dumpall -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" \
+        --globals-only \
+        --no-role-passwords \
+        -f "$globals_file" 2>> "$LOG_FILE"; then
+        
+        chmod 600 "$globals_file"
+        local file_size
+        file_size=$(get_file_size "$globals_file")
+        log "SUCCESS" "Global objects backed up: $globals_file ($file_size)"
+        return 0
+    else
+        log "ERROR" "Failed to backup global objects"
+        return 1
+    fi
+}
+
+# Backup a single database
+backup_database() {
+    local database="$1"
+    local backup_file="${BACKUP_DIR}/${DATE_STAMP}/${database}_${TIMESTAMP}.dump"
+    local start_time
+    start_time=$(date +%s)
+    
+    log "INFO" "Starting backup of database: $database"
+    
+    # Get database size before backup
+    local db_size
+    db_size=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -t -c \
+        "SELECT pg_size_pretty(pg_database_size('$database'));" 2>/dev/null | xargs)
+    log "INFO" "Database size: ${db_size:-unknown}"
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "INFO" "[DRY-RUN] Would backup $database to: $backup_file"
+        return 0
+    fi
+    
+    # Execute pg_dump with professional settings
+    # -Fc: Custom format (compressed, supports parallel restore)
+    # -Z: Compression level (0-9)
+    # -v: Verbose mode (logged to file)
+    # --lock-wait-timeout: Max time to wait for locks
+    # --blobs: Include large objects
+    # --encoding: Ensure UTF-8 encoding
+    
+    if pg_dump -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" \
+        -Fc \
+        -Z "$BACKUP_COMPRESSION_LEVEL" \
+        --lock-wait-timeout="${LOCK_WAIT_TIMEOUT}s" \
+        --blobs \
+        --encoding=UTF8 \
+        -f "$backup_file" \
+        "$database" 2>> "$LOG_FILE"; then
+        
+        local end_time
+        end_time=$(date +%s)
+        local duration=$((end_time - start_time))
+        local duration_human
+        duration_human=$(seconds_to_human "$duration")
+        
+        # Set secure permissions
+        chmod 600 "$backup_file"
+        
+        # Get backup file size
+        local file_size
+        file_size=$(get_file_size "$backup_file")
+        
+        # Verify backup integrity
+        if pg_restore -l "$backup_file" &> /dev/null; then
+            log "SUCCESS" "Backup completed: $database -> $backup_file"
+            log "SUCCESS" "  Size: $file_size | Duration: $duration_human | Verified: OK"
+            ((BACKUP_SUCCESS_COUNT++))
+            return 0
+        else
+            log "ERROR" "Backup verification FAILED for: $database"
+            ((BACKUP_FAILURE_COUNT++))
+            return 1
+        fi
+    else
+        log "ERROR" "Backup FAILED for database: $database"
+        ((BACKUP_FAILURE_COUNT++))
+        return 1
+    fi
+}
+
+# Run backup for all databases
+run_backup() {
+    log_separator
+    log "INFO" "Starting database backup process..."
+    BACKUP_START_TIME=$(date +%s)
+    
+    # Check for specific database override
+    if [[ -n "${SPECIFIC_DATABASE:-}" ]]; then
+        DATABASES_TO_BACKUP=("$SPECIFIC_DATABASE")
+        log "INFO" "Backing up specific database: $SPECIFIC_DATABASE"
+    else
+        if ! get_databases; then
+            log "CRITICAL" "Failed to retrieve database list - aborting backup"
+            return 1
+        fi
+    fi
+    
+    # Backup global objects first (CRITICAL - must succeed)
+    if ! backup_globals; then
+        log "CRITICAL" "Failed to backup global objects (roles, tablespaces) - aborting backup"
+        return 1
+    fi
+    
+    # Backup each database
+    # Note: We continue with other databases if one fails to maximize backup coverage
+    for database in "${DATABASES_TO_BACKUP[@]}"; do
+        backup_database "$database" || log "ERROR" "Failed to backup database: $database (continuing with others)"
+    done
+    
+    local backup_end_time
+    backup_end_time=$(date +%s)
+    local total_duration=$((backup_end_time - BACKUP_START_TIME))
+    local total_duration_human
+    total_duration_human=$(seconds_to_human "$total_duration")
+    
+    log_separator
+    log "INFO" "Backup Summary:"
+    log "INFO" "  Total databases: ${{ '{#' }}DATABASES_TO_BACKUP[@]}"
+    log "INFO" "  Successful: $BACKUP_SUCCESS_COUNT"
+    log "INFO" "  Failed: $BACKUP_FAILURE_COUNT"
+    log "INFO" "  Total duration: $total_duration_human"
+    log_separator
+    
+    # Return failure if any database backup failed
+    if [[ $BACKUP_FAILURE_COUNT -gt 0 ]]; then
+        return 1
+    fi
+    
+    return 0
+}
+
+#===============================================================================
+# RETENTION MANAGEMENT
+#===============================================================================
+
+cleanup_old_backups() {
+    log "INFO" "Starting cleanup of old backups (retention: ${BACKUP_RETENTION_DAYS} days)..."
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "INFO" "[DRY-RUN] Would delete backups older than ${BACKUP_RETENTION_DAYS} days"
+        find "$BACKUP_DIR" -type f \( -name "*.dump" -o -name "*.sql" \) -mtime "+${BACKUP_RETENTION_DAYS}" -print | while read -r file; do
+            log "INFO" "[DRY-RUN] Would delete: $file"
+        done
+        return 0
+    fi
+    
+    local deleted_count=0
+    local deleted_size=0
+    
+    # Find and delete old backup files
+    while IFS= read -r file; do
+        if [[ -f "$file" ]]; then
+            local file_size
+            file_size=$(stat -c %s "$file" 2>/dev/null || stat -f %z "$file" 2>/dev/null || echo 0)
+            deleted_size=$((deleted_size + file_size))
+            
+            log "INFO" "Deleting old backup: $file"
+            rm -f "$file"
+            ((deleted_count++))
+        fi
+    done < <(find "$BACKUP_DIR" -type f \( -name "*.dump" -o -name "*.sql" \) -mtime "+${BACKUP_RETENTION_DAYS}")
+    
+    # Remove empty dated directories
+    find "$BACKUP_DIR" -type d -empty -delete 2>/dev/null || true
+    
+    # Convert deleted size to human readable
+    local deleted_size_human
+    if [[ $deleted_size -gt 0 ]]; then
+        deleted_size_human=$(numfmt --to=iec-i --suffix=B "$deleted_size" 2>/dev/null || echo "${deleted_size} bytes")
+    else
+        deleted_size_human="0 bytes"
+    fi
+    
+    log "INFO" "Cleanup completed: deleted $deleted_count file(s), freed $deleted_size_human"
+    
+    return 0
+}
+
+#===============================================================================
+# MAIN EXECUTION
+#===============================================================================
+
+main() {
+    # Record script start time
+    local script_start_time
+    script_start_time=$(date +%s)
+    
+    # Parse command line arguments
+    parse_arguments "$@"
+    
+    # Initialize logging
+    init_logging
+    
+    # Log script start banner
+    log_start_banner
+    
+    # Log configuration
+    log "INFO" "Configuration:"
+    log "INFO" "  PostgreSQL Host: ${PG_HOST}:${PG_PORT}"
+    log "INFO" "  PostgreSQL User: $PG_USER"
+    log "INFO" "  Backup Directory: $BACKUP_DIR"
+    log "INFO" "  Retention Period: ${BACKUP_RETENTION_DAYS} days"
+    log "INFO" "  Compression Level: $BACKUP_COMPRESSION_LEVEL"
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "WARNING" "DRY-RUN MODE - No actual backups will be created"
+    fi
+    
+    log_separator
+    
+    # Run pre-flight checks
+    if ! run_preflight_checks; then
+        log "CRITICAL" "Backup process aborted due to failed pre-flight checks"
+        local duration
+        duration=$(seconds_to_human $(($(date +%s) - script_start_time)))
+        log_end_banner "FAILED" "$duration" "1"
+        exit 1
+    fi
+    
+    # Run backup
+    if ! run_backup; then
+        log "CRITICAL" "Backup process failed"
+        local duration
+        duration=$(seconds_to_human $(($(date +%s) - script_start_time)))
+        log_end_banner "FAILED" "$duration" "1"
+        exit 1
+    fi
+    
+    # Cleanup old backups
+    cleanup_old_backups
+    
+    # Calculate total duration
+    local duration
+    duration=$(seconds_to_human $(($(date +%s) - script_start_time)))
+    
+    # Final status
+    if [[ $BACKUP_FAILURE_COUNT -eq 0 ]]; then
+        log "SUCCESS" "All database backups completed successfully"
+        log_end_banner "SUCCESS" "$duration" "0"
+        exit 0
+    else
+        log "WARNING" "Backup completed with $BACKUP_FAILURE_COUNT failure(s)"
+        log_end_banner "PARTIAL" "$duration" "1"
+        exit 1
+    fi
+}
+
+# Trap for cleanup on script exit
+cleanup_on_exit() {
+    local exit_code=$?
+    if [[ $exit_code -ne 0 ]]; then
+        log "ERROR" "Script exited with code: $exit_code"
+    fi
+}
+trap cleanup_on_exit EXIT
+
+# Run main function
+main "$@"

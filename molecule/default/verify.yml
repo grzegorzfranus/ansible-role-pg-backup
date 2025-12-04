@@ -1,0 +1,254 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Molecule Verification Playbook
+# =============================================================================
+# This playbook verifies the installation and configuration of pg-backup role.
+# It performs comprehensive checks of:
+# - Backup script installation
+# - .pgpass configuration
+# - Cron job setup
+# - Logrotate configuration
+# - Directory structure
+# - Backup execution test
+#
+# Flow:
+# 1. Load variables
+# 2. Verify script installation
+# 3. Verify .pgpass configuration
+# 4. Verify directory structure
+# 5. Verify cron configuration
+# 6. Verify logrotate configuration
+# 7. Test backup execution
+# =============================================================================
+
+- name: molecule | Verify Role
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    pg_backup_script_path: "/usr/local/bin/pg_backup.sh"
+    pg_backup_dir: "/var/backups/postgresql"
+    pg_backup_log_dir: "/var/log/postgresql"
+    pg_backup_log_file: "/var/log/postgresql/pg_backup.log"
+    pg_backup_user: "postgres"
+    pg_backup_group: "postgres"
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # 1. Verify Script Installation
+    # -------------------------------------------------------------------------
+    - name: Verify | Check if backup script exists
+      ansible.builtin.stat:
+        path: "{{ pg_backup_script_path }}"
+      register: script_stat
+
+    - name: Verify | Assert backup script exists
+      ansible.builtin.assert:
+        that:
+          - script_stat.stat.exists
+          - script_stat.stat.executable
+        fail_msg: "Backup script not found or not executable at {{ pg_backup_script_path }}"
+        success_msg: "Backup script verified at {{ pg_backup_script_path }}"
+
+    - name: Verify | Check backup script permissions
+      ansible.builtin.stat:
+        path: "{{ pg_backup_script_path }}"
+      register: script_perms
+
+    - name: Verify | Assert script permissions are correct
+      ansible.builtin.assert:
+        that:
+          - script_perms.stat.mode == "0750"
+        fail_msg: "Script permissions incorrect: {{ script_perms.stat.mode }}"
+        success_msg: "Script permissions correct: 0750"
+
+    - name: Verify | Check backup script syntax
+      ansible.builtin.command:
+        cmd: "bash -n {{ pg_backup_script_path }}"
+      register: syntax_check
+      changed_when: false
+
+    - name: Verify | Assert script syntax is valid
+      ansible.builtin.assert:
+        that:
+          - syntax_check.rc == 0
+        fail_msg: "Backup script has syntax errors"
+        success_msg: "Backup script syntax is valid"
+
+    # -------------------------------------------------------------------------
+    # 2. Verify .pgpass Configuration
+    # -------------------------------------------------------------------------
+    - name: Verify | Check .pgpass file exists
+      ansible.builtin.stat:
+        path: "/var/lib/postgresql/.pgpass"
+      register: pgpass_stat
+
+    - name: Verify | Assert .pgpass file exists
+      ansible.builtin.assert:
+        that:
+          - pgpass_stat.stat.exists
+        fail_msg: ".pgpass file not found"
+        success_msg: ".pgpass file exists"
+
+    - name: Verify | Check .pgpass file permissions
+      ansible.builtin.stat:
+        path: "/var/lib/postgresql/.pgpass"
+      register: pgpass_perms
+
+    - name: Verify | Assert .pgpass permissions are secure (0600)
+      ansible.builtin.assert:
+        that:
+          - pgpass_perms.stat.mode == "0600"
+        fail_msg: ".pgpass permissions insecure: {{ pgpass_perms.stat.mode }}"
+        success_msg: ".pgpass permissions correct: 0600"
+
+    # -------------------------------------------------------------------------
+    # 3. Verify Directory Structure
+    # -------------------------------------------------------------------------
+    - name: Verify | Check backup directory exists
+      ansible.builtin.stat:
+        path: "{{ pg_backup_dir }}"
+      register: backup_dir_stat
+
+    - name: Verify | Assert backup directory exists
+      ansible.builtin.assert:
+        that:
+          - backup_dir_stat.stat.exists
+          - backup_dir_stat.stat.isdir
+        fail_msg: "Backup directory not found: {{ pg_backup_dir }}"
+        success_msg: "Backup directory exists: {{ pg_backup_dir }}"
+
+    - name: Verify | Check log directory exists
+      ansible.builtin.stat:
+        path: "{{ pg_backup_log_dir }}"
+      register: log_dir_stat
+
+    - name: Verify | Assert log directory exists
+      ansible.builtin.assert:
+        that:
+          - log_dir_stat.stat.exists
+          - log_dir_stat.stat.isdir
+        fail_msg: "Log directory not found: {{ pg_backup_log_dir }}"
+        success_msg: "Log directory exists: {{ pg_backup_log_dir }}"
+
+    # -------------------------------------------------------------------------
+    # 4. Verify Cron Configuration
+    # -------------------------------------------------------------------------
+    - name: Verify | Check cron job exists for postgres user
+      ansible.builtin.command:
+        cmd: "crontab -u {{ pg_backup_user }} -l"
+      register: cron_check
+      changed_when: false
+      failed_when: false
+
+    - name: Verify | Assert cron job is configured
+      ansible.builtin.assert:
+        that:
+          - "'pg_backup.sh' in cron_check.stdout"
+        fail_msg: "Cron job for pg_backup.sh not found"
+        success_msg: "Cron job configured correctly"
+
+    # -------------------------------------------------------------------------
+    # 5. Verify Logrotate Configuration
+    # -------------------------------------------------------------------------
+    - name: Verify | Check logrotate config exists
+      ansible.builtin.stat:
+        path: "/etc/logrotate.d/pg_backup"
+      register: logrotate_stat
+
+    - name: Verify | Assert logrotate config exists
+      ansible.builtin.assert:
+        that:
+          - logrotate_stat.stat.exists
+        fail_msg: "Logrotate configuration not found"
+        success_msg: "Logrotate configuration exists"
+
+    - name: Verify | Validate logrotate configuration
+      ansible.builtin.command:
+        cmd: "logrotate -d /etc/logrotate.d/pg_backup"
+      register: logrotate_check
+      changed_when: false
+      failed_when: false
+
+    # -------------------------------------------------------------------------
+    # 6. Test Backup Execution (Dry Run)
+    # -------------------------------------------------------------------------
+    - name: Verify | Run backup script in dry-run mode
+      become: true
+      become_user: "{{ pg_backup_user }}"
+      ansible.builtin.command:
+        cmd: "{{ pg_backup_script_path }} -d"
+      register: backup_dry_run
+      changed_when: false
+
+    - name: Verify | Assert dry-run completed successfully
+      ansible.builtin.assert:
+        that:
+          - backup_dry_run.rc == 0
+        fail_msg: "Backup dry-run failed with rc={{ backup_dry_run.rc }}"
+        success_msg: "Backup dry-run completed successfully"
+
+    # -------------------------------------------------------------------------
+    # 7. Test Actual Backup Execution
+    # -------------------------------------------------------------------------
+    - name: Verify | Run actual backup
+      become: true
+      become_user: "{{ pg_backup_user }}"
+      ansible.builtin.command:
+        cmd: "{{ pg_backup_script_path }}"
+      register: backup_run
+      changed_when: false
+
+    - name: Verify | Assert backup completed successfully
+      ansible.builtin.assert:
+        that:
+          - backup_run.rc == 0
+        fail_msg: "Backup failed with rc={{ backup_run.rc }}"
+        success_msg: "Backup completed successfully"
+
+    - name: Verify | Check backup files were created
+      ansible.builtin.find:
+        paths: "{{ pg_backup_dir }}"
+        patterns: "*.dump"
+        recurse: true
+      register: backup_files
+
+    - name: Verify | Assert backup files exist
+      ansible.builtin.assert:
+        that:
+          - backup_files.matched > 0
+        fail_msg: "No backup files found in {{ pg_backup_dir }}"
+        success_msg: "Found {{ backup_files.matched }} backup file(s)"
+
+    - name: Verify | Check globals backup was created
+      ansible.builtin.find:
+        paths: "{{ pg_backup_dir }}"
+        patterns: "globals_*.sql"
+        recurse: true
+      register: globals_files
+
+    - name: Verify | Assert globals backup exists
+      ansible.builtin.assert:
+        that:
+          - globals_files.matched > 0
+        fail_msg: "No globals backup found"
+        success_msg: "Globals backup created successfully"
+
+    # -------------------------------------------------------------------------
+    # 8. Final Summary
+    # -------------------------------------------------------------------------
+    - name: Verify | Show verification summary
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "  PostgreSQL Backup Role Verification: PASSED"
+          - "=============================================="
+          - "  Script installed: {{ pg_backup_script_path }}"
+          - "  Backup directory: {{ pg_backup_dir }}"
+          - "  Log directory: {{ pg_backup_log_dir }}"
+          - "  Cron job: Configured"
+          - "  Logrotate: Configured"
+          - "  Backup files created: {{ backup_files.matched }}"
+          - "  Globals backup: Created"
+          - "=============================================="

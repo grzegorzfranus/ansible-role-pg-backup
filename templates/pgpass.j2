@@ -1,0 +1,10 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+{{ ansible_managed | comment }}
+
+# PostgreSQL password file for backup authentication
+# Format: hostname:port:database:username:password
+# See: https://www.postgresql.org/docs/current/libpq-pgpass.html
+#
+# SECURITY: This file must have permissions 0600
+
+{{ pg_backup_pg_host }}:{{ pg_backup_pg_port }}:*:{{ pg_backup_pg_user }}:{{ pg_backup_pg_password }}

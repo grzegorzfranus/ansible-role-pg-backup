@@ -1,0 +1,123 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Molecule Preparation Playbook
+# =============================================================================
+# This playbook prepares the test environment for Molecule testing.
+# It installs PostgreSQL and creates test databases for backup testing.
+#
+# Flow:
+# 1. Fix system file permissions
+# 2. Install PostgreSQL server
+# 3. Start PostgreSQL service
+# 4. Create test databases
+# 5. Configure .pgpass for testing
+# =============================================================================
+
+- name: molecule | Prepare
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    pg_test_password: "molecule_test_password"
+    pg_test_databases:
+      - testdb1
+      - testdb2
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # 1. System File Permissions
+    # -------------------------------------------------------------------------
+    - name: Prepare | Fix /etc/shadow permissions
+      ansible.builtin.file:
+        path: /etc/shadow
+        mode: "0640"
+      changed_when: false
+
+    # -------------------------------------------------------------------------
+    # 2. Install PostgreSQL Server
+    # -------------------------------------------------------------------------
+    - name: Prepare | Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Prepare | Install PostgreSQL server
+      ansible.builtin.apt:
+        name:
+          - postgresql
+          - postgresql-contrib
+          - postgresql-client
+        state: present
+
+    # -------------------------------------------------------------------------
+    # 3. Start PostgreSQL Service
+    # -------------------------------------------------------------------------
+    - name: Prepare | Start PostgreSQL service
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Prepare | Wait for PostgreSQL to be ready
+      ansible.builtin.wait_for:
+        port: 5432
+        host: localhost
+        timeout: 30
+
+    # -------------------------------------------------------------------------
+    # 4. Configure PostgreSQL for Testing
+    # -------------------------------------------------------------------------
+    - name: Prepare | Set postgres user password
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: postgres
+        password: "{{ pg_test_password }}"
+        state: present
+      no_log: true
+
+    - name: Prepare | Create test databases
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_db:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ pg_test_databases }}"
+
+    - name: Prepare | Create test table in testdb1
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_query:
+        db: testdb1
+        query: |
+          CREATE TABLE IF NOT EXISTS test_table (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          INSERT INTO test_table (name) VALUES ('test_row_1'), ('test_row_2');
+
+    # -------------------------------------------------------------------------
+    # 5. Configure .pgpass for Testing
+    # -------------------------------------------------------------------------
+    - name: Prepare | Create .pgpass file for postgres user
+      ansible.builtin.copy:
+        content: "localhost:5432:*:postgres:{{ pg_test_password }}"
+        dest: /var/lib/postgresql/.pgpass
+        owner: postgres
+        group: postgres
+        mode: "0600"
+      no_log: true
+
+    - name: Prepare | Verify PostgreSQL connectivity
+      become: true
+      become_user: postgres
+      ansible.builtin.command:
+        cmd: psql -c "SELECT version();"
+      register: pg_version
+      changed_when: false
+
+    - name: Prepare | Show PostgreSQL version
+      ansible.builtin.debug:
+        msg: "PostgreSQL installed: {{ pg_version.stdout_lines[2] | default('unknown') }}"

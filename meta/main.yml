@@ -1,0 +1,32 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Metadata
+# =============================================================================
+
+galaxy_info:
+  role_name: pg_backup
+  author: Grzegorz Franus
+  namespace: grzegorzfranus
+  description: >
+    Professional PostgreSQL database backup role with comprehensive logging and retention management.
+  license: Apache-2.0
+  company: EWARE
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+
+  galaxy_tags:
+    - postgresql
+    - backup
+    - database
+    - cron
+    - logrotate
+
+dependencies: []

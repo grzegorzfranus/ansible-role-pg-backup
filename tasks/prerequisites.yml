@@ -1,0 +1,138 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Prerequisites
+# =============================================================================
+# This file contains tasks to verify and install system prerequisites required
+# for PostgreSQL backup operations. It ensures all required packages and
+# dependencies are available before proceeding with installation.
+#
+# Flow:
+# 1. Update Package Cache
+# 2. Install Required Packages
+# 3. Verify PostgreSQL Client Tools
+# 4. Verify User Exists
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Update Package Cache
+# -----------------------------------------------------------------------------
+- name: PgBackup | prerequisites | Update apt package cache
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: >
+    not ansible_check_mode
+
+# -----------------------------------------------------------------------------
+# 2. Install Required Packages
+# -----------------------------------------------------------------------------
+- name: PgBackup | prerequisites | Install PostgreSQL client packages
+  become: true
+  ansible.builtin.apt:
+    name: "{{ pg_backup_required_packages }}"
+    state: present
+  when: >
+    not ansible_check_mode
+
+- name: PgBackup | prerequisites | Install utility packages
+  become: true
+  ansible.builtin.apt:
+    name: "{{ pg_backup_utility_packages }}"
+    state: present
+  when: >
+    not ansible_check_mode
+
+# -----------------------------------------------------------------------------
+# 3. Verify PostgreSQL Client Tools
+# -----------------------------------------------------------------------------
+- name: PgBackup | prerequisites | Check pg_dump is available
+  ansible.builtin.command: which pg_dump
+  register: pg_backup_pg_dump_check
+  changed_when: false
+  failed_when: false
+
+- name: PgBackup | prerequisites | Verify pg_dump availability
+  ansible.builtin.assert:
+    that:
+      - pg_backup_pg_dump_check.rc == 0
+    fail_msg: >-
+      pg_dump command not found. Please install postgresql-client package.
+    success_msg: "pg_dump is available at {{ pg_backup_pg_dump_check.stdout }}"
+  when: >
+    not ansible_check_mode
+
+- name: PgBackup | prerequisites | Check pg_dumpall is available
+  ansible.builtin.command: which pg_dumpall
+  register: pg_backup_pg_dumpall_check
+  changed_when: false
+  failed_when: false
+
+- name: PgBackup | prerequisites | Verify pg_dumpall availability
+  ansible.builtin.assert:
+    that:
+      - pg_backup_pg_dumpall_check.rc == 0
+    fail_msg: >-
+      pg_dumpall command not found. Please install postgresql-client package.
+    success_msg: "pg_dumpall is available at {{ pg_backup_pg_dumpall_check.stdout }}"
+  when: >
+    not ansible_check_mode
+
+- name: PgBackup | prerequisites | Check psql is available
+  ansible.builtin.command: which psql
+  register: pg_backup_psql_check
+  changed_when: false
+  failed_when: false
+
+- name: PgBackup | prerequisites | Verify psql availability
+  ansible.builtin.assert:
+    that:
+      - pg_backup_psql_check.rc == 0
+    fail_msg: >-
+      psql command not found. Please install postgresql-client package.
+    success_msg: "psql is available at {{ pg_backup_psql_check.stdout }}"
+  when: >
+    not ansible_check_mode
+
+- name: PgBackup | prerequisites | Check pg_isready is available
+  ansible.builtin.command: which pg_isready
+  register: pg_backup_pg_isready_check
+  changed_when: false
+  failed_when: false
+
+- name: PgBackup | prerequisites | Verify pg_isready availability
+  ansible.builtin.assert:
+    that:
+      - pg_backup_pg_isready_check.rc == 0
+    fail_msg: >-
+      pg_isready command not found. Please install postgresql-client package.
+    success_msg: "pg_isready is available at {{ pg_backup_pg_isready_check.stdout }}"
+  when: >
+    not ansible_check_mode
+
+# -----------------------------------------------------------------------------
+# 4. Verify User Exists
+# -----------------------------------------------------------------------------
+- name: PgBackup | prerequisites | Check backup user exists
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ pg_backup_user }}"
+  register: pg_backup_user_check
+  failed_when: false
+
+- name: PgBackup | prerequisites | Verify backup user exists
+  ansible.builtin.assert:
+    that:
+      - pg_backup_user_check is not failed
+    fail_msg: >-
+      User '{{ pg_backup_user }}' does not exist.
+      Please create the user or specify a valid pg_backup_user.
+    success_msg: "Backup user '{{ pg_backup_user }}' exists"
+
+- name: PgBackup | prerequisites | Display prerequisites status
+  ansible.builtin.debug:
+    msg:
+      - "All prerequisites verified successfully"
+      - "PostgreSQL client tools: installed"
+      - "Backup user: {{ pg_backup_user }}"
+  changed_when: false

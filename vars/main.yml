@@ -1,0 +1,65 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Internal Variables
+# =============================================================================
+# Role-specific variables that should NOT be overridden by users.
+# These variables are used internally by the role and contain system-specific
+# values, package names, and technical constants.
+#
+# Sections:
+#   1. Package Requirements
+#   2. Platform Support
+#   3. Script Metadata
+#   4. Logging Defaults
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Package Requirements
+# -----------------------------------------------------------------------------
+# Required packages for PostgreSQL backup operations.
+
+# PostgreSQL client packages required for backup functionality
+# - postgresql-client: Contains pg_dump, pg_dumpall, psql
+pg_backup_required_packages:
+  - postgresql-client
+
+# Utility packages needed for the backup script
+pg_backup_utility_packages:
+  - coreutils
+  - gzip
+
+# -----------------------------------------------------------------------------
+# 2. Platform Support
+# -----------------------------------------------------------------------------
+# Supported operating system versions and compatibility matrix.
+
+# Supported Ubuntu versions for this role
+# Only LTS versions are officially supported for stability
+pg_backup_supported_ubuntu_versions:
+  - "22.04"  # Ubuntu 22.04 LTS (Jammy Jellyfish)
+  - "24.04"  # Ubuntu 24.04 LTS (Noble Numbat)
+
+# Supported Debian versions for this role
+# Only stable versions are officially supported
+pg_backup_supported_debian_versions:
+  - "12"     # Debian 12 (Bookworm)
+
+# -----------------------------------------------------------------------------
+# 3. Script Metadata
+# -----------------------------------------------------------------------------
+# Backup script version and configuration.
+
+# Backup script version (updated when script template changes)
+pg_backup_script_version: "1.0.0"
+
+# Script name for logging purposes
+pg_backup_script_name: "pg_backup.sh"
+
+# -----------------------------------------------------------------------------
+# 4. Logging Defaults
+# -----------------------------------------------------------------------------
+# Fallback values for logging configuration
+
+# Default log user and group (matches backup user for consistency)
+pg_backup_log_user: "{{ pg_backup_user }}"
+pg_backup_log_group: "{{ pg_backup_group }}"

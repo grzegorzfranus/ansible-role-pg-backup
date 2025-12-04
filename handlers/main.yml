@@ -1,0 +1,31 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Handlers
+# =============================================================================
+# Handlers are used to perform actions in response to configuration changes.
+# These handlers manage cron job updates and logrotate verification when
+# notified by tasks that modify system configuration.
+#
+# Variables:
+#   pg_backup_cron_name - Name of the cron job to manage
+#   pg_backup_user - User that runs the backup script
+#
+# Handler Triggers:
+#   reload cron - Triggered when cron configuration changes
+#   test logrotate - Triggered when logrotate configuration changes
+# =============================================================================
+
+- name: PgBackup | handlers | Reload cron service
+  become: true
+  ansible.builtin.systemd:
+    name: cron
+    state: reloaded
+  listen: "reload cron"
+  failed_when: false
+
+- name: PgBackup | handlers | Test logrotate configuration
+  become: true
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/pg_backup
+  listen: "test logrotate"
+  changed_when: false
+  failed_when: false

@@ -1,0 +1,45 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Cron Configuration
+# =============================================================================
+# This file contains tasks to configure the cron job for automated PostgreSQL
+# backups. It sets up scheduled execution of the backup script with proper
+# logging and error handling.
+#
+# Flow:
+# 1. Configure Backup Cron Job
+# 2. Display Configuration Status
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Configure Backup Cron Job
+# -----------------------------------------------------------------------------
+- name: PgBackup | cron | Configure backup cron job
+  become: true
+  ansible.builtin.cron:
+    name: "{{ pg_backup_cron_name }}"
+    user: "{{ pg_backup_user }}"
+    minute: "{{ pg_backup_cron_minute }}"
+    hour: "{{ pg_backup_cron_hour }}"
+    day: "{{ pg_backup_cron_day }}"
+    month: "{{ pg_backup_cron_month }}"
+    weekday: "{{ pg_backup_cron_weekday }}"
+    job: >-
+      {{ pg_backup_script_path }}
+      >> {{ pg_backup_cron_log_file }} 2>&1
+    state: present
+  register: pg_backup_cron_result
+
+# -----------------------------------------------------------------------------
+# 2. Display Configuration Status
+# -----------------------------------------------------------------------------
+- name: PgBackup | cron | Display cron configuration status
+  ansible.builtin.debug:
+    msg:
+      - "Cron job configured successfully"
+      - "Name: {{ pg_backup_cron_name }}"
+      - "User: {{ pg_backup_user }}"
+      - "Schedule: {{ pg_backup_cron_minute }} {{ pg_backup_cron_hour }} {{ pg_backup_cron_day }} {{ pg_backup_cron_month }} {{ pg_backup_cron_weekday }}"
+      - "Script: {{ pg_backup_script_path }}"
+      - "Cron log: {{ pg_backup_cron_log_file }}"
+  changed_when: false

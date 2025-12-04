@@ -1,0 +1,9 @@
+skip_list:
+  - role-name
+  - meta-no-info
+
+profile: min
+
+exclude_paths:
+  - molecule/**
+  - .github/workflows/**

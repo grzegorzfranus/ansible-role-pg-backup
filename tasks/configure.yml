@@ -1,0 +1,122 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Configuration
+# =============================================================================
+# This file contains tasks to configure the PostgreSQL backup environment,
+# including directory creation, .pgpass file setup, and log file management.
+#
+# Flow:
+# 1. Create Backup Directory Structure
+# 2. Configure .pgpass Authentication
+# 3. Create Log Directory and Files
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Create Backup Directory Structure
+# -----------------------------------------------------------------------------
+- name: PgBackup | configure | Create backup directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ pg_backup_dir }}"
+    state: directory
+    owner: "{{ pg_backup_user }}"
+    group: "{{ pg_backup_group }}"
+    mode: "{{ pg_backup_dir_mode }}"
+
+# -----------------------------------------------------------------------------
+# 2. Configure .pgpass Authentication
+# -----------------------------------------------------------------------------
+- name: PgBackup | configure | Get backup user home directory
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ pg_backup_user }}"
+  register: pg_backup_user_info
+
+- name: PgBackup | configure | Set .pgpass file path
+  ansible.builtin.set_fact:
+    pg_backup_pgpass_path: "{{ pg_backup_user_info.ansible_facts.getent_passwd[pg_backup_user][4] }}/.pgpass"
+
+- name: PgBackup | configure | Create .pgpass file
+  become: true
+  ansible.builtin.template:
+    src: pgpass.j2
+    dest: "{{ pg_backup_pgpass_path }}"
+    owner: "{{ pg_backup_user }}"
+    group: "{{ pg_backup_group }}"
+    mode: "{{ pg_backup_pgpass_mode }}"
+    backup: true
+  when: >
+    pg_backup_configure_pgpass | bool and
+    pg_backup_pg_password | length > 0
+  no_log: true
+
+- name: PgBackup | configure | Verify .pgpass file exists (when not managing)
+  become: true
+  ansible.builtin.stat:
+    path: "{{ pg_backup_pgpass_path }}"
+  register: pg_backup_pgpass_stat
+  when: >
+    not pg_backup_configure_pgpass | bool or
+    pg_backup_pg_password | length == 0
+
+- name: PgBackup | configure | Check .pgpass permissions
+  become: true
+  ansible.builtin.file:
+    path: "{{ pg_backup_pgpass_path }}"
+    owner: "{{ pg_backup_user }}"
+    group: "{{ pg_backup_group }}"
+    mode: "{{ pg_backup_pgpass_mode }}"
+  when: >
+    pg_backup_pgpass_stat is defined and
+    pg_backup_pgpass_stat.stat.exists | default(false)
+
+# -----------------------------------------------------------------------------
+# 3. Create Log Directory and Files
+# -----------------------------------------------------------------------------
+- name: PgBackup | configure | Create log directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ pg_backup_log_dir }}"
+    state: directory
+    owner: "{{ pg_backup_log_user }}"
+    group: "{{ pg_backup_log_group }}"
+    mode: "{{ pg_backup_log_dir_mode }}"
+  when: >
+    pg_backup_enable_logging | bool
+
+- name: PgBackup | configure | Create log file
+  become: true
+  ansible.builtin.file:
+    path: "{{ pg_backup_log_file }}"
+    state: touch
+    owner: "{{ pg_backup_log_user }}"
+    group: "{{ pg_backup_log_group }}"
+    mode: "{{ pg_backup_log_file_mode }}"
+    modification_time: preserve
+    access_time: preserve
+  when: >
+    pg_backup_enable_logging | bool
+
+- name: PgBackup | configure | Create cron log file
+  become: true
+  ansible.builtin.file:
+    path: "{{ pg_backup_cron_log_file }}"
+    state: touch
+    owner: "{{ pg_backup_log_user }}"
+    group: "{{ pg_backup_log_group }}"
+    mode: "{{ pg_backup_log_file_mode }}"
+    modification_time: preserve
+    access_time: preserve
+  when: >
+    pg_backup_enable_logging | bool and
+    pg_backup_cron_enabled | bool
+
+- name: PgBackup | configure | Display configuration status
+  ansible.builtin.debug:
+    msg:
+      - "Backup configuration completed"
+      - "Backup directory: {{ pg_backup_dir }}"
+      - ".pgpass configured: {{ pg_backup_configure_pgpass and (pg_backup_pg_password | length > 0) }}"
+      - "Log directory: {{ pg_backup_log_dir }}"
+      - "Log file: {{ pg_backup_log_file }}"
+  changed_when: false

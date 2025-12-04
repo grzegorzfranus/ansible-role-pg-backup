@@ -1,0 +1,61 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Script Installation
+# =============================================================================
+# This file contains tasks to deploy the PostgreSQL backup script and ensure
+# proper permissions and ownership are set. The script is templated to allow
+# full parameterization through Ansible variables.
+#
+# Flow:
+# 1. Create Script Directory (if needed)
+# 2. Deploy Backup Script
+# 3. Set Permissions
+# 4. Verify Script
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Create Script Directory
+# -----------------------------------------------------------------------------
+- name: PgBackup | install | Ensure script directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ pg_backup_script_path | dirname }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+
+# -----------------------------------------------------------------------------
+# 2. Deploy Backup Script
+# -----------------------------------------------------------------------------
+- name: PgBackup | install | Deploy PostgreSQL backup script
+  become: true
+  ansible.builtin.template:
+    src: scripts/pg_backup.sh.j2
+    dest: "{{ pg_backup_script_path }}"
+    owner: root
+    group: "{{ pg_backup_group }}"
+    mode: "{{ pg_backup_script_mode }}"
+    backup: true
+  register: pg_backup_script_deployed
+
+# -----------------------------------------------------------------------------
+# 3. Verify Script
+# -----------------------------------------------------------------------------
+- name: PgBackup | install | Verify script syntax
+  become: true
+  ansible.builtin.command: bash -n "{{ pg_backup_script_path }}"
+  changed_when: false
+  when: >
+    pg_backup_script_deployed is changed and
+    not ansible_check_mode
+
+- name: PgBackup | install | Display installation status
+  ansible.builtin.debug:
+    msg:
+      - "Backup script installed successfully"
+      - "Script path: {{ pg_backup_script_path }}"
+      - "Owner: root:{{ pg_backup_group }}"
+      - "Mode: {{ pg_backup_script_mode }}"
+      - "Version: {{ pg_backup_script_version }}"
+  changed_when: false

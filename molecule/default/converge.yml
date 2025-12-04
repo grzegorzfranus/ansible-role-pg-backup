@@ -1,0 +1,56 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Molecule Convergence Playbook
+# =============================================================================
+# This playbook executes the main role functionality in the test environment.
+# It applies the PostgreSQL backup role with test configuration.
+#
+# Flow:
+# 1. Pre-tasks setup
+# 2. Apply pg-backup role
+# =============================================================================
+
+- name: molecule | Converge
+  hosts: all
+  become: true
+
+  vars:
+    # Test configuration for pg-backup role
+    pg_backup_pg_host: "localhost"
+    pg_backup_pg_port: 5432
+    pg_backup_pg_user: "postgres"
+    pg_backup_pg_password: "molecule_test_password"
+    pg_backup_configure_pgpass: true
+    pg_backup_dir: "/var/backups/postgresql"
+    pg_backup_retention_days: 7
+    pg_backup_compression_level: 6
+    pg_backup_cron_enabled: true
+    pg_backup_cron_hour: "2"
+    pg_backup_cron_minute: "0"
+    pg_backup_enable_logging: true
+    pg_backup_configure_logrotate: true
+    pg_backup_exclude_databases:
+      - "template0"
+      - "template1"
+
+  pre_tasks:
+    - name: Converge | Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 600
+      changed_when: false
+
+    - name: Converge | Wait for systemd to complete initialization
+      ansible.builtin.command:
+        cmd: systemctl is-system-running
+      register: systemctl_status
+      until: >
+        'running' in systemctl_status.stdout or
+        'degraded' in systemctl_status.stdout
+      retries: 30
+      delay: 5
+      changed_when: false
+      failed_when: systemctl_status.rc > 1
+
+  roles:
+    - role: ansible-role-pg-backup

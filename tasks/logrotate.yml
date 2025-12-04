@@ -1,0 +1,64 @@
+---
+# =============================================================================
+# Ansible Role: PostgreSQL Backup - Logrotate Configuration
+# =============================================================================
+# This file contains tasks to configure logrotate for PostgreSQL backup logs.
+# It ensures proper log rotation to prevent disk space issues and maintains
+# organized log archives.
+#
+# Flow:
+# 1. Create Archive Directory
+# 2. Deploy Logrotate Configuration
+# 3. Verify Configuration
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Create Archive Directory
+# -----------------------------------------------------------------------------
+- name: PgBackup | logrotate | Create log archive directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ pg_backup_logrotate_options.archive_directory_path }}"
+    state: directory
+    owner: "{{ pg_backup_log_user }}"
+    group: "{{ pg_backup_log_group }}"
+    mode: "{{ pg_backup_log_dir_mode }}"
+  when: >
+    pg_backup_logrotate_options.archive_directory_path is defined
+
+# -----------------------------------------------------------------------------
+# 2. Deploy Logrotate Configuration
+# -----------------------------------------------------------------------------
+- name: PgBackup | logrotate | Deploy logrotate configuration
+  become: true
+  ansible.builtin.template:
+    src: logrotate/pg_backup.j2
+    dest: /etc/logrotate.d/pg_backup
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: pg_backup_logrotate_config
+
+# -----------------------------------------------------------------------------
+# 3. Verify Configuration
+# -----------------------------------------------------------------------------
+- name: PgBackup | logrotate | Verify logrotate configuration syntax
+  become: true
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/pg_backup
+  register: pg_backup_logrotate_check
+  changed_when: false
+  failed_when: false
+  when: >
+    pg_backup_logrotate_config is changed and
+    not ansible_check_mode
+
+- name: PgBackup | logrotate | Display logrotate configuration status
+  ansible.builtin.debug:
+    msg:
+      - "Logrotate configuration deployed"
+      - "Config file: /etc/logrotate.d/pg_backup"
+      - "Frequency: {{ pg_backup_logrotate_options.frequency }}"
+      - "Retention: {{ pg_backup_logrotate_options.count }} files"
+      - "Archive directory: {{ pg_backup_logrotate_options.archive_directory_path }}"
+  changed_when: false
