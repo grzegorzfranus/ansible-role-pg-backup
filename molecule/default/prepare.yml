@@ -7,8 +7,8 @@
 #
 # Flow:
 # 1. Fix system file permissions
-# 2. Install PostgreSQL server
-# 3. Start PostgreSQL service
+# 2. Install required packages (PostgreSQL, cron, logrotate)
+# 3. Start services
 # 4. Create test databases
 # 5. Configure .pgpass for testing
 # =============================================================================
@@ -35,7 +35,7 @@
       changed_when: false
 
     # -------------------------------------------------------------------------
-    # 2. Install PostgreSQL Server
+    # 2. Install Required Packages
     # -------------------------------------------------------------------------
     - name: Prepare | Update apt cache
       ansible.builtin.apt:
@@ -43,18 +43,26 @@
         cache_valid_time: 3600
       when: ansible_facts['os_family'] == "Debian"
 
-    - name: Prepare | Install PostgreSQL server
+    - name: Prepare | Install PostgreSQL server and utilities
       ansible.builtin.apt:
         name:
           - postgresql
           - postgresql-contrib
           - postgresql-client
+          - cron
+          - logrotate
         state: present
       when: ansible_facts['os_family'] == "Debian"
 
     # -------------------------------------------------------------------------
-    # 3. Start PostgreSQL Service
+    # 3. Start Services
     # -------------------------------------------------------------------------
+    - name: Prepare | Start cron service
+      ansible.builtin.service:
+        name: cron
+        state: started
+        enabled: true
+
     - name: Prepare | Start PostgreSQL service
       ansible.builtin.service:
         name: postgresql
