@@ -41,6 +41,7 @@
       ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
 
     - name: Prepare | Install PostgreSQL server
       ansible.builtin.apt:
@@ -49,6 +50,7 @@
           - postgresql-contrib
           - postgresql-client
         state: present
+      when: ansible_os_family == "Debian"
 
     # -------------------------------------------------------------------------
     # 3. Start PostgreSQL Service
@@ -63,11 +65,25 @@
       ansible.builtin.wait_for:
         port: 5432
         host: localhost
-        timeout: 30
+        timeout: 60
 
     # -------------------------------------------------------------------------
     # 4. Configure PostgreSQL for Testing
     # -------------------------------------------------------------------------
+    - name: Prepare | Get postgres user home directory
+      ansible.builtin.getent:
+        database: passwd
+        key: postgres
+      register: postgres_user_info
+
+    - name: Prepare | Set postgres home directory fact
+      ansible.builtin.set_fact:
+        postgres_home: "{{ postgres_user_info.ansible_facts.getent_passwd.postgres[4] }}"
+
+    - name: Prepare | Display postgres home directory
+      ansible.builtin.debug:
+        msg: "PostgreSQL home directory: {{ postgres_home }}"
+
     - name: Prepare | Set postgres user password
       become: true
       become_user: postgres
@@ -111,7 +127,7 @@
     - name: Prepare | Create .pgpass file for postgres user
       ansible.builtin.copy:
         content: "localhost:5432:*:postgres:{{ pg_test_password }}"
-        dest: /var/lib/postgresql/.pgpass
+        dest: "{{ postgres_home }}/.pgpass"
         owner: postgres
         group: postgres
         mode: "0600"

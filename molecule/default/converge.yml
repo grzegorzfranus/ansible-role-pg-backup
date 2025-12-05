@@ -13,6 +13,7 @@
 - name: molecule | Converge
   hosts: all
   become: true
+  gather_facts: true
 
   vars:
     # Test configuration for pg-backup role
@@ -34,21 +35,37 @@
       - "template1"
 
   pre_tasks:
+    - name: Converge | Display OS information
+      ansible.builtin.debug:
+        msg: "Running on {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
     - name: Converge | Update apt cache
       ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 600
       changed_when: false
+      when: ansible_os_family == "Debian"
 
     - name: Converge | Wait for systemd to complete initialization
       ansible.builtin.command:
         cmd: systemctl is-system-running
       register: systemctl_status
-      until: systemctl_status.stdout is search('running') or systemctl_status.stdout is search('degraded')
+      until: >
+        systemctl_status.stdout is defined and
+        (systemctl_status.stdout is search('running') or
+         systemctl_status.stdout is search('degraded'))
       retries: 30
       delay: 5
       changed_when: false
       failed_when: false
+
+    - name: Converge | Verify PostgreSQL is running
+      ansible.builtin.service_facts:
+
+    - name: Converge | Display PostgreSQL service status
+      ansible.builtin.debug:
+        msg: "PostgreSQL service state: {{ ansible_facts.services['postgresql.service'].state | default('not found') }}"
+      when: "'postgresql.service' in ansible_facts.services"
 
   roles:
     - role: ansible-role-pg-backup

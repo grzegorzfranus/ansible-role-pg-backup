@@ -47,7 +47,9 @@ provisioner:
       pipelining: true
   env:
     ANSIBLE_FORCE_COLOR: "true"
-    ANSIBLE_VERBOSITY: "1"
+    ANSIBLE_VERBOSITY: "2"
+    ANSIBLE_DISPLAY_SKIPPED_HOSTS: "true"
+    ANSIBLE_DISPLAY_OK_HOSTS: "true"
 
 verifier:
   name: ansible
