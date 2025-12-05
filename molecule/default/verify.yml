@@ -36,6 +36,19 @@
 
   tasks:
     # -------------------------------------------------------------------------
+    # 0. Get postgres home directory
+    # -------------------------------------------------------------------------
+    - name: Verify | Get postgres user home directory
+      ansible.builtin.getent:
+        database: passwd
+        key: postgres
+      register: postgres_user_info
+
+    - name: Verify | Set postgres home directory fact
+      ansible.builtin.set_fact:
+        postgres_home: "{{ postgres_user_info.ansible_facts.getent_passwd.postgres[4] }}"
+
+    # -------------------------------------------------------------------------
     # 1. Verify Script Installation
     # -------------------------------------------------------------------------
     - name: Verify | Check if backup script exists
@@ -81,19 +94,19 @@
     # -------------------------------------------------------------------------
     - name: Verify | Check .pgpass file exists
       ansible.builtin.stat:
-        path: "/var/lib/postgresql/.pgpass"
+        path: "{{ postgres_home }}/.pgpass"
       register: pgpass_stat
 
     - name: Verify | Assert .pgpass file exists
       ansible.builtin.assert:
         that:
           - pgpass_stat.stat.exists
-        fail_msg: ".pgpass file not found"
+        fail_msg: ".pgpass file not found at {{ postgres_home }}/.pgpass"
         success_msg: ".pgpass file exists"
 
     - name: Verify | Check .pgpass file permissions
       ansible.builtin.stat:
-        path: "/var/lib/postgresql/.pgpass"
+        path: "{{ postgres_home }}/.pgpass"
       register: pgpass_perms
 
     - name: Verify | Assert .pgpass permissions are secure (0600)

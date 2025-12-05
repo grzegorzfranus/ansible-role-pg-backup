@@ -37,14 +37,14 @@
   pre_tasks:
     - name: Converge | Display OS information
       ansible.builtin.debug:
-        msg: "Running on {{ ansible_distribution }} {{ ansible_distribution_version }}"
+        msg: "Running on {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
 
     - name: Converge | Update apt cache
       ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 600
       changed_when: false
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     - name: Converge | Wait for systemd to complete initialization
       ansible.builtin.command:
