@@ -5,6 +5,21 @@ All notable changes to this Ansible role will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/grzegorzfranus/ansible-role-pg-backup/compare/v1.0.1...v1.1.0) (2026-05-21)
+
+
+### Features
+
+* migrate to centralized CI, Release Please, and Galaxy publish ([#1](https://github.com/grzegorzfranus/ansible-role-pg-backup/issues/1)) ([9a4f843](https://github.com/grzegorzfranus/ansible-role-pg-backup/commit/9a4f8430e8ff41657a945ea2d7d274755598714d))
+
+
+### Bug Fixes
+
+* correct Molecule role path configuration ([9ceeecc](https://github.com/grzegorzfranus/ansible-role-pg-backup/commit/9ceeecc46982c4f81490ac7c3b0cc0a431d24a27))
+* improve Molecule tests for cross-distribution compatibility ([8e905a0](https://github.com/grzegorzfranus/ansible-role-pg-backup/commit/8e905a0f24fb078d8e080c2662e2c1c632876d00))
+* install cron and logrotate in Molecule test environment ([2cb16bb](https://github.com/grzegorzfranus/ansible-role-pg-backup/commit/2cb16bb236b11c429d9d1c046f3b998314d0ee9f))
+* update Ansible facts syntax for 2.24 compatibility ([ef957d2](https://github.com/grzegorzfranus/ansible-role-pg-backup/commit/ef957d27a7228ae74bbf0a500e90bb3fef3505d0))
+
 ## [1.0.1] - 2025-12-05
 
 ### Added ✅
