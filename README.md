@@ -2,7 +2,7 @@
 
 |Source|Version|CI|License|
 |------|-------|-------|-------|
-|[![Source Code](https://img.shields.io/badge/source-github-blue.svg)](https://github.com/grzegorzfranus/ansible-role-pg-backup)|[![Version](https://img.shields.io/github/v/release/grzegorzfranus/ansible-role-pg-backup)](https://github.com/grzegorzfranus/ansible-role-pg-backup/releases)|[![tests](https://github.com/grzegorzfranus/ansible-role-pg-backup/actions/workflows/test-and-validation.yml/badge.svg)](https://github.com/grzegorzfranus/ansible-role-pg-backup/actions)|[![Repository License](https://img.shields.io/badge/license-apache2.0-brightgreen.svg)](LICENSE)|
+|[![Source Code](https://img.shields.io/badge/source-github-blue.svg)](https://github.com/grzegorzfranus/ansible-role-pg-backup)|[![Version](https://img.shields.io/github/v/release/grzegorzfranus/ansible-role-pg-backup)](https://github.com/grzegorzfranus/ansible-role-pg-backup/releases)|[![tests](https://github.com/grzegorzfranus/ansible-role-pg-backup/actions/workflows/ci.yml/badge.svg)](https://github.com/grzegorzfranus/ansible-role-pg-backup/actions)|[![Repository License](https://img.shields.io/badge/license-apache2.0-brightgreen.svg)](LICENSE)|
 
 Professional Ansible role for automated PostgreSQL database backups with comprehensive logging, retention management, and cron scheduling.
 
@@ -311,9 +311,14 @@ tail -f /var/log/postgresql/pg_backup.log
 ```
 ansible-role-pg-backup/
 ├── .github/                  # GitHub Actions workflows
+│   └── workflows/
+│       ├── ci.yml            # Centralized CI workflow
+│       └── release.yml       # Release Please & Galaxy publishing
+├── .release-please-manifest.json # Release Please manifest
 ├── CHANGELOG.md              # Version history
 ├── LICENSE                   # Apache-2.0 license
 ├── README.md                 # This documentation
+├── release-please-config.json # Release Please configuration
 ├── defaults/
 │   └── main.yml              # Default variables
 ├── handlers/
@@ -399,21 +404,43 @@ pip install molecule molecule-plugins[docker] ansible-lint
 molecule test
 ```
 
-## 🔧 CI/CD Integration
+## CI/CD Pipeline
 
-This role includes GitHub Actions workflows for automated testing and deployment:
+### CI Pipeline
 
-- **Test & Validation**: Runs Molecule tests on Ubuntu and Debian
-- **Galaxy Publishing**: Automatically publishes to Ansible Galaxy on release
+Runs on every Pull Request via centralized reusable workflow:
 
-## 🤝 Contributing
+1. **Branch Name Lint** — enforces naming conventions (`feature/`, `bugfix/`, etc.)
+2. **YAML Lint** — validates all YAML files
+3. **Ansible Lint** — enforces best practices and guidelines compliance (production profile)
+4. **Security Scan** — TruffleHog secret detection
+5. **Molecule Tests** — matrix across Debian 11/12 and Ubuntu 22.04/24.04
+6. **Merge Check** — aggregated status check for branch protection
+
+### Release & Publish
+
+Automated via [Release Please](https://github.com/googleapis/release-please):
+
+1. Merge to `main` → Release Please creates a Release PR with changelog
+2. Merge Release PR → creates Git tag + GitHub Release
+3. Galaxy publish triggers automatically on release using centralized action
+
+## Contributing
 
 Contributions, bug reports, and feature requests are welcome!
 
-- Fork the repository and create your branch from `main`.
-- Make your changes with clear, descriptive commit messages.
-- Ensure your code passes all Molecule and lint tests.
-- Submit a pull request describing your changes.
+- Fork the repository and create your branch from `main`
+- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages:
+  - `feat:` — new features (minor version bump)
+  - `fix:` — bug fixes (patch version bump)
+  - `docs:` — documentation changes
+  - `refactor:` — code refactoring
+  - `test:` — test additions
+  - `ci:` — CI/CD changes
+  - `chore:` — maintenance tasks
+- Use branch naming convention: `feature/`, `bugfix/`, `hotfix/`, `docs/`, `refactor/`, `test/`, `chore/`, `ci/`
+- Ensure your code passes all CI checks (YAML lint, Ansible lint, Molecule tests)
+- Submit a pull request describing your changes
 
 ## 📝 License
 
