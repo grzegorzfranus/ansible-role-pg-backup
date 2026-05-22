@@ -5,6 +5,13 @@ All notable changes to this Ansible role will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/grzegorzfranus/ansible-role-pg-backup/compare/v1.1.0...v1.2.0) (2026-05-22)
+
+
+### Features
+
+* **ci:** add pr-title-validation, concurrency and fix syntax check i… ([#3](https://github.com/grzegorzfranus/ansible-role-pg-backup/issues/3)) ([1c856b4](https://github.com/grzegorzfranus/ansible-role-pg-backup/commit/1c856b4a6453a348de4b4aeaadd7b4fff3dbe33d))
+
 ## [1.1.0](https://github.com/grzegorzfranus/ansible-role-pg-backup/compare/v1.0.1...v1.1.0) (2026-05-21)
 
 
