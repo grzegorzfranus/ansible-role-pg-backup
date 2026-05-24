@@ -213,6 +213,19 @@ Customize for specific requirements:
 | `pg_backup_logrotate_options.compress` | Compress rotated logs | `true` |
 | `pg_backup_logrotate_options.archive_directory_path` | Directory for archived logs | `{{ pg_backup_log_dir }}/archived` |
 
+## 📌 Role Properties
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| **Idempotent** | ✅ Yes | Running the role multiple times with the same variables produces the same result. |
+| **Atomic** | ❌ No | The role can be partially applied. A failure mid-execution may leave some configuration parts incomplete. |
+| **Check Mode** | ✅ Supported | All tasks support check mode. Destructive actions (like package installation) are skipped. |
+| **Diff Mode** | ✅ Supported | Configuration templates support diff mode. |
+
+## 📤 Role Output
+
+This role does not set any public output facts.
+
 ## 🔍 Verification
 
 After deployment, verify the backup system is working:
