@@ -5,6 +5,13 @@ All notable changes to this Ansible role will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1](https://github.com/grzegorzfranus/ansible-role-pg-backup/compare/v1.2.0...v1.2.1) (2026-05-24)
+
+
+### Documentation
+
+* add Role Properties and Role Output sections to README.md ([#5](https://github.com/grzegorzfranus/ansible-role-pg-backup/issues/5)) ([c6bf64c](https://github.com/grzegorzfranus/ansible-role-pg-backup/commit/c6bf64c551a839cabcce19c8e394650aa9dee6b5))
+
 ## [1.2.0](https://github.com/grzegorzfranus/ansible-role-pg-backup/compare/v1.1.0...v1.2.0) (2026-05-22)
 
 
