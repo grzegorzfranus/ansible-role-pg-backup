@@ -1,21 +1,10 @@
 ---
 # =============================================================================
-# Ansible Role: PostgreSQL Backup - Script Installation
+# Ansible Role: PostgreSQL Backup - Tasks: Install
 # =============================================================================
-# This file contains tasks to deploy the PostgreSQL backup script and ensure
-# proper permissions and ownership are set. The script is templated to allow
-# full parameterization through Ansible variables.
-#
-# Flow:
-# 1. Create Script Directory (if needed)
-# 2. Deploy Backup Script
-# 3. Set Permissions
-# 4. Verify Script
+# Deploy and verify the PostgreSQL backup script.
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 1. Create Script Directory
-# -----------------------------------------------------------------------------
 - name: PgBackup | install | Ensure script directory exists
   become: true
   ansible.builtin.file:
@@ -25,9 +14,6 @@
     owner: root
     group: root
 
-# -----------------------------------------------------------------------------
-# 2. Deploy Backup Script
-# -----------------------------------------------------------------------------
 - name: PgBackup | install | Deploy PostgreSQL backup script
   become: true
   ansible.builtin.template:
@@ -39,9 +25,6 @@
     backup: true
   register: pg_backup_script_deployed
 
-# -----------------------------------------------------------------------------
-# 3. Verify Script
-# -----------------------------------------------------------------------------
 - name: PgBackup | install | Verify script syntax
   become: true
   ansible.builtin.command: bash -n "{{ pg_backup_script_path }}"

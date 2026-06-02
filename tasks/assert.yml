@@ -1,23 +1,11 @@
 ---
 # =============================================================================
-# Ansible Role: PostgreSQL Backup - Variable Validation
+# Ansible Role: PostgreSQL Backup - Tasks: Assertions
 # =============================================================================
-# This file contains validation tasks to ensure all required variables are
-# properly defined and have valid values. It performs comprehensive checks
-# on configuration parameters, paths, and system requirements.
-#
-# Flow:
-# 1. General Settings Validation
-# 2. PostgreSQL Connection Validation
-# 3. Backup Settings Validation
-# 4. Logging Configuration Validation
-# 5. Cron Schedule Validation
-# 6. Timeout Settings Validation
+# Runtime validation of variable values.
+# Basic type/choice validation is handled by meta/argument_specs.yml.
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 1. General Settings Validation
-# -----------------------------------------------------------------------------
 - name: PgBackup | assert | Validate role action
   ansible.builtin.assert:
     that:
@@ -44,9 +32,6 @@
       pg_backup_group: {{ pg_backup_group | default('undefined') }}
     success_msg: "User/group configuration is valid: {{ pg_backup_user }}:{{ pg_backup_group }}"
 
-# -----------------------------------------------------------------------------
-# 2. PostgreSQL Connection Validation
-# -----------------------------------------------------------------------------
 - name: PgBackup | assert | Validate PostgreSQL connection settings
   ansible.builtin.assert:
     that:
@@ -60,6 +45,8 @@
       - pg_backup_pg_user is defined
       - pg_backup_pg_user is string
       - pg_backup_pg_user | length > 0
+      - pg_backup_pg_password is defined
+      - pg_backup_pg_password is string
     fail_msg: >-
       Invalid PostgreSQL connection settings.
       Host: {{ pg_backup_pg_host | default('undefined') }},
@@ -83,9 +70,6 @@
       Mode: {{ pg_backup_pgpass_mode | default('undefined') }}
     success_msg: ".pgpass configuration is valid"
 
-# -----------------------------------------------------------------------------
-# 3. Backup Settings Validation
-# -----------------------------------------------------------------------------
 - name: PgBackup | assert | Validate exclude databases list
   ansible.builtin.assert:
     that:
@@ -128,6 +112,15 @@
       Mode: {{ pg_backup_script_mode | default('undefined') }}
     success_msg: "Script settings are valid: {{ pg_backup_script_path }}"
 
+- name: PgBackup | assert | Validate backup file permissions
+  ansible.builtin.assert:
+    that:
+      - pg_backup_file_mode is defined
+      - pg_backup_file_mode is string
+      - pg_backup_file_mode | regex_search('^0[0-7]{3}$') is not none
+    fail_msg: "Invalid pg_backup_file_mode permissions: {{ pg_backup_file_mode | default('undefined') }}. Must be an octal string like '0600'"
+    success_msg: "Backup file permissions are valid: {{ pg_backup_file_mode }}"
+
 - name: PgBackup | assert | Validate compression level
   ansible.builtin.assert:
     that:
@@ -152,9 +145,6 @@
       Must be between 1 and 365.
     success_msg: "Retention settings are valid: {{ pg_backup_retention_days }} days"
 
-# -----------------------------------------------------------------------------
-# 4. Logging Configuration Validation
-# -----------------------------------------------------------------------------
 - name: PgBackup | assert | Validate logging settings
   ansible.builtin.assert:
     that:
@@ -181,9 +171,6 @@
   when: >
     pg_backup_enable_logging | bool
 
-# -----------------------------------------------------------------------------
-# 5. Cron Schedule Validation
-# -----------------------------------------------------------------------------
 - name: PgBackup | assert | Validate cron settings
   ansible.builtin.assert:
     that:
@@ -197,6 +184,10 @@
       - pg_backup_cron_day is defined
       - pg_backup_cron_month is defined
       - pg_backup_cron_weekday is defined
+      - pg_backup_cron_log_file is defined
+      - pg_backup_cron_log_file is string
+      - pg_backup_cron_log_file | length > 0
+      - pg_backup_cron_log_file is search('^/')
     fail_msg: >-
       Invalid cron configuration.
       Enabled: {{ pg_backup_cron_enabled | default('undefined') }},
@@ -209,9 +200,6 @@
   when: >
     pg_backup_cron_enabled | bool
 
-# -----------------------------------------------------------------------------
-# 6. Timeout Settings Validation
-# -----------------------------------------------------------------------------
 - name: PgBackup | assert | Validate timeout settings
   ansible.builtin.assert:
     that:
@@ -232,9 +220,6 @@
       Lock wait {{ pg_backup_lock_wait_timeout }}s,
       Connection {{ pg_backup_connection_timeout }}s
 
-# -----------------------------------------------------------------------------
-# 7. Logrotate Configuration Validation
-# -----------------------------------------------------------------------------
 - name: PgBackup | assert | Validate logrotate settings
   ansible.builtin.assert:
     that:

@@ -1,27 +1,11 @@
 ---
 # =============================================================================
-# Ansible Role: PostgreSQL Backup - Main Tasks
+# Ansible Role: PostgreSQL Backup - Tasks: Main
 # =============================================================================
-# This is the main task file for the PostgreSQL backup role. It orchestrates
-# the execution of all role components in the correct order to deploy a
-# professional backup solution. Each task is tagged appropriately for
-# selective execution.
-#
-# Flow:
-# 1. Operating System Validation
-# 2. Load OS-Specific Variables
-# 3. Validate Role Variables and Requirements
-# 4. Check System Prerequisites
-# 5. Install Backup Script and Dependencies
-# 6. Configure PostgreSQL Access (.pgpass)
-# 7. Configure Directories and Permissions
-# 8. Configure Logrotate
-# 9. Configure Cron Job
+# Orchestrates role execution in order.
+# Flow: OS validation → vars → assert → prerequisites → install → configure → logrotate → cron
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 1. Operating System Validation
-# -----------------------------------------------------------------------------
 - name: PgBackup | assert | Validate supported operating system
   ansible.builtin.fail:
     msg: >-
@@ -39,9 +23,6 @@
     - validate
     - check
 
-# -----------------------------------------------------------------------------
-# 2. OS-Specific Variables (reserved for future use)
-# -----------------------------------------------------------------------------
 - name: PgBackup | include_vars | Gather OS specific variables
   ansible.builtin.include_vars: "{{ lookup('first_found', params) }}"
   vars:
@@ -59,9 +40,6 @@
     - setup
     - init
 
-# -----------------------------------------------------------------------------
-# 3. Variable Validation
-# -----------------------------------------------------------------------------
 - name: PgBackup | assert | Validate role variables and requirements
   ansible.builtin.include_tasks: assert.yml
   tags:
@@ -69,9 +47,6 @@
     - validate
     - check
 
-# -----------------------------------------------------------------------------
-# 4. System Prerequisites
-# -----------------------------------------------------------------------------
 - name: PgBackup | prerequisites | Verify system prerequisites
   ansible.builtin.include_tasks: prerequisites.yml
   when: >
@@ -81,9 +56,6 @@
     - prerequisites
     - requirements
 
-# -----------------------------------------------------------------------------
-# 5. Script Installation
-# -----------------------------------------------------------------------------
 - name: PgBackup | install | Install backup script
   ansible.builtin.include_tasks: install.yml
   when: >
@@ -92,9 +64,6 @@
     - setup
     - install
 
-# -----------------------------------------------------------------------------
-# 6. Configuration
-# -----------------------------------------------------------------------------
 - name: PgBackup | configure | Configure backup settings
   ansible.builtin.include_tasks: configure.yml
   when: >
@@ -104,9 +73,6 @@
     - configure
     - config
 
-# -----------------------------------------------------------------------------
-# 7. Logrotate Configuration
-# -----------------------------------------------------------------------------
 - name: PgBackup | logrotate | Configure log rotation
   ansible.builtin.include_tasks: logrotate.yml
   when: >
@@ -118,9 +84,6 @@
     - config
     - logrotate
 
-# -----------------------------------------------------------------------------
-# 8. Cron Job Configuration
-# -----------------------------------------------------------------------------
 - name: PgBackup | cron | Configure backup schedule
   ansible.builtin.include_tasks: cron.yml
   when: >

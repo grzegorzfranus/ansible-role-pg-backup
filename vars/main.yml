@@ -2,9 +2,8 @@
 # =============================================================================
 # Ansible Role: PostgreSQL Backup - Internal Variables
 # =============================================================================
-# Role-specific variables that should NOT be overridden by users.
-# These variables are used internally by the role and contain system-specific
-# values, package names, and technical constants.
+# This file defines common internal variables that should NOT be overridden by users.
+# These variables contain system-specific values, package names, and technical constants.
 #
 # Sections:
 #   1. Package Requirements

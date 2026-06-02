@@ -2,12 +2,14 @@
 # =============================================================================
 # Ansible Role: PostgreSQL Backup - Default Variables
 # =============================================================================
-# This file defines default configuration values for PostgreSQL database backup.
+# This file defines default configuration values for the PostgreSQL Backup role.
 # These values can be overridden by setting them in your playbook or inventory.
 #
-# SECURITY PRIORITY: This configuration focuses on secure backup operations
-# with proper file permissions, credential management via .pgpass, and
-# comprehensive logging for audit purposes.
+# Supported OS distributions:
+# - Ubuntu 24.04 (Noble) and variants
+# - Ubuntu 22.04 (Jammy) and variants
+# - Debian 12 (Bookworm) and variants
+# - Debian 11 (Bullseye) and variants
 #
 # Sections:
 #   1. General Settings

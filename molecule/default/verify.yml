@@ -21,7 +21,7 @@
 # 7. Test backup execution
 # =============================================================================
 
-- name: molecule | Verify Role
+- name: Molecule | Verify Role
   hosts: all
   become: true
   gather_facts: true
