@@ -1,21 +1,10 @@
 ---
 # =============================================================================
-# Ansible Role: PostgreSQL Backup - Prerequisites
+# Ansible Role: PostgreSQL Backup - Tasks: Prerequisites
 # =============================================================================
-# This file contains tasks to verify and install system prerequisites required
-# for PostgreSQL backup operations. It ensures all required packages and
-# dependencies are available before proceeding with installation.
-#
-# Flow:
-# 1. Update Package Cache
-# 2. Install Required Packages
-# 3. Verify PostgreSQL Client Tools
-# 4. Verify User Exists
+# Install required packages and verify system utilities.
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 1. Update Package Cache
-# -----------------------------------------------------------------------------
 - name: PgBackup | prerequisites | Update apt package cache
   become: true
   ansible.builtin.apt:
@@ -24,9 +13,6 @@
   when: >
     not ansible_check_mode
 
-# -----------------------------------------------------------------------------
-# 2. Install Required Packages
-# -----------------------------------------------------------------------------
 - name: PgBackup | prerequisites | Install PostgreSQL client packages
   become: true
   ansible.builtin.apt:
@@ -43,9 +29,6 @@
   when: >
     not ansible_check_mode
 
-# -----------------------------------------------------------------------------
-# 3. Verify PostgreSQL Client Tools
-# -----------------------------------------------------------------------------
 - name: PgBackup | prerequisites | Check pg_dump is available
   ansible.builtin.command: which pg_dump
   register: pg_backup_pg_dump_check
@@ -110,9 +93,6 @@
   when: >
     not ansible_check_mode
 
-# -----------------------------------------------------------------------------
-# 4. Verify User Exists
-# -----------------------------------------------------------------------------
 - name: PgBackup | prerequisites | Check backup user exists
   ansible.builtin.getent:
     database: passwd

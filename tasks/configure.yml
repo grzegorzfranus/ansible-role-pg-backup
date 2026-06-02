@@ -1,19 +1,10 @@
 ---
 # =============================================================================
-# Ansible Role: PostgreSQL Backup - Configuration
+# Ansible Role: PostgreSQL Backup - Tasks: Configure
 # =============================================================================
-# This file contains tasks to configure the PostgreSQL backup environment,
-# including directory creation, .pgpass file setup, and log file management.
-#
-# Flow:
-# 1. Create Backup Directory Structure
-# 2. Configure .pgpass Authentication
-# 3. Create Log Directory and Files
+# Configure the PostgreSQL backup environment, directory, authentication, and logs.
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 1. Create Backup Directory Structure
-# -----------------------------------------------------------------------------
 - name: PgBackup | configure | Create backup directory
   become: true
   ansible.builtin.file:
@@ -23,9 +14,6 @@
     group: "{{ pg_backup_group }}"
     mode: "{{ pg_backup_dir_mode }}"
 
-# -----------------------------------------------------------------------------
-# 2. Configure .pgpass Authentication
-# -----------------------------------------------------------------------------
 - name: PgBackup | configure | Get backup user home directory
   ansible.builtin.getent:
     database: passwd
@@ -70,9 +58,6 @@
     pg_backup_pgpass_stat is defined and
     pg_backup_pgpass_stat.stat.exists | default(false)
 
-# -----------------------------------------------------------------------------
-# 3. Create Log Directory and Files
-# -----------------------------------------------------------------------------
 - name: PgBackup | configure | Create log directory
   become: true
   ansible.builtin.file:

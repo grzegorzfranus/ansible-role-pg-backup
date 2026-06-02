@@ -13,7 +13,7 @@
 # 5. Configure .pgpass for testing
 # =============================================================================
 
-- name: molecule | Prepare
+- name: Molecule | Prepare
   hosts: all
   become: true
   gather_facts: true

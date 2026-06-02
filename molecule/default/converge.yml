@@ -10,7 +10,7 @@
 # 2. Apply pg-backup role
 # =============================================================================
 
-- name: molecule | Converge
+- name: Molecule | Converge
   hosts: all
   become: true
   gather_facts: true
@@ -47,7 +47,7 @@
       when: ansible_facts['os_family'] == "Debian"
 
     - name: Converge | Wait for systemd to complete initialization
-      ansible.builtin.command:
+      ansible.builtin.command:  # noqa command-instead-of-module
         cmd: systemctl is-system-running
       register: systemctl_status
       until: >
@@ -68,4 +68,4 @@
       when: "'postgresql.service' in ansible_facts.services"
 
   roles:
-    - role: ../../..
+    - role: ../../.. # noqa role-name[path]

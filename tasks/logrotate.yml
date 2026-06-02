@@ -1,20 +1,10 @@
 ---
 # =============================================================================
-# Ansible Role: PostgreSQL Backup - Logrotate Configuration
+# Ansible Role: PostgreSQL Backup - Tasks: Logrotate
 # =============================================================================
-# This file contains tasks to configure logrotate for PostgreSQL backup logs.
-# It ensures proper log rotation to prevent disk space issues and maintains
-# organized log archives.
-#
-# Flow:
-# 1. Create Archive Directory
-# 2. Deploy Logrotate Configuration
-# 3. Verify Configuration
+# Configure log rotation for backup logs to manage disk space.
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 1. Create Archive Directory
-# -----------------------------------------------------------------------------
 - name: PgBackup | logrotate | Create log archive directory
   become: true
   ansible.builtin.file:
@@ -26,9 +16,6 @@
   when: >
     pg_backup_logrotate_options.archive_directory_path is defined
 
-# -----------------------------------------------------------------------------
-# 2. Deploy Logrotate Configuration
-# -----------------------------------------------------------------------------
 - name: PgBackup | logrotate | Deploy logrotate configuration
   become: true
   ansible.builtin.template:
@@ -40,9 +27,6 @@
     backup: true
   register: pg_backup_logrotate_config
 
-# -----------------------------------------------------------------------------
-# 3. Verify Configuration
-# -----------------------------------------------------------------------------
 - name: PgBackup | logrotate | Verify logrotate configuration syntax
   become: true
   ansible.builtin.command: logrotate -d /etc/logrotate.d/pg_backup

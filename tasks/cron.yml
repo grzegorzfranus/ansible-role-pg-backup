@@ -1,19 +1,10 @@
 ---
 # =============================================================================
-# Ansible Role: PostgreSQL Backup - Cron Configuration
+# Ansible Role: PostgreSQL Backup - Tasks: Cron
 # =============================================================================
-# This file contains tasks to configure the cron job for automated PostgreSQL
-# backups. It sets up scheduled execution of the backup script with proper
-# logging and error handling.
-#
-# Flow:
-# 1. Configure Backup Cron Job
-# 2. Display Configuration Status
+# Configure cron job schedule for automated PostgreSQL backups.
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 1. Configure Backup Cron Job
-# -----------------------------------------------------------------------------
 - name: PgBackup | cron | Configure backup cron job
   become: true
   ansible.builtin.cron:
@@ -30,9 +21,6 @@
     state: present
   register: pg_backup_cron_result
 
-# -----------------------------------------------------------------------------
-# 2. Display Configuration Status
-# -----------------------------------------------------------------------------
 - name: PgBackup | cron | Display cron configuration status
   ansible.builtin.debug:
     msg:

@@ -1,0 +1,191 @@
+---
+argument_specs:
+  main:
+    short_description: "Automated PostgreSQL database backups"
+    description:
+      - "Deploys an automated backup script, configures cron tasks, manages .pgpass files, and handles log rotation."
+      - "Supports Ubuntu 22.04/24.04 and Debian 11/12."
+    author: "Grzegorz Franus"
+
+    options:
+      # General Settings
+      pg_backup_role_action:
+        description: "Define which parts of the role to execute."
+        type: str
+        default: "all"
+        choices:
+          - all
+          - install
+          - configure
+
+      pg_backup_cron_enabled:
+        description: "Enable/disable the backup cron job."
+        type: bool
+        default: true
+
+      pg_backup_user:
+        description: "User that will run the backup script and own related files."
+        type: str
+        default: "postgres"
+
+      pg_backup_group:
+        description: "Group for backup files and directories."
+        type: str
+        default: "postgres"
+
+      # PostgreSQL Connection Settings
+      pg_backup_pg_host:
+        description: "PostgreSQL server hostname or IP address."
+        type: str
+        default: "localhost"
+
+      pg_backup_pg_port:
+        description: "PostgreSQL server port."
+        type: int
+        default: 5432
+
+      pg_backup_pg_user:
+        description: "PostgreSQL username for backup operations."
+        type: str
+        default: "postgres"
+
+      pg_backup_pg_password:
+        description: "PostgreSQL password for backup user."
+        type: str
+        default: ""
+
+      pg_backup_configure_pgpass:
+        description: "Configure .pgpass file for password authentication."
+        type: bool
+        default: true
+
+      pg_backup_pgpass_mode:
+        description: ".pgpass file permissions."
+        type: str
+        default: "0600"
+
+      # Backup Settings
+      pg_backup_dir:
+        description: "Directory where backups will be stored."
+        type: str
+        default: "/var/backups/postgresql"
+
+      pg_backup_dir_mode:
+        description: "Directory permissions for backup directory."
+        type: str
+        default: "0750"
+
+      pg_backup_file_mode:
+        description: "Backup file permissions."
+        type: str
+        default: "0600"
+
+      pg_backup_compression_level:
+        description: "Compression level for pg_dump (0-9)."
+        type: int
+        default: 6
+
+      pg_backup_script_path:
+        description: "Path where the backup script will be installed."
+        type: str
+        default: "/usr/local/bin/pg_backup.sh"
+
+      pg_backup_script_mode:
+        description: "Script file permissions."
+        type: str
+        default: "0750"
+
+      pg_backup_exclude_databases:
+        description: "List of databases to exclude from backup."
+        type: list
+        elements: str
+        default:
+          - "template0"
+          - "template1"
+
+      # Retention Settings
+      pg_backup_retention_days:
+        description: "Number of days to keep backups before auto-deletion."
+        type: int
+        default: 7
+
+      # Logging Configuration
+      pg_backup_enable_logging:
+        description: "Enable dedicated logging for backup operations."
+        type: bool
+        default: true
+
+      pg_backup_log_dir:
+        description: "Directory for backup log files."
+        type: str
+        default: "/var/log/postgresql"
+
+      pg_backup_log_dir_mode:
+        description: "Log directory permissions."
+        type: str
+        default: "0755"
+
+      pg_backup_log_file:
+        description: "Main backup log file path."
+        type: str
+
+      pg_backup_log_file_mode:
+        description: "Log file permissions."
+        type: str
+        default: "0640"
+
+      # Cron Schedule Settings
+      pg_backup_cron_name:
+        description: "Cron job name for identification."
+        type: str
+        default: "PostgreSQL Daily Backup"
+
+      pg_backup_cron_minute:
+        description: "Backup schedule: minute."
+        type: str
+        default: "0"
+
+      pg_backup_cron_hour:
+        description: "Backup schedule: hour."
+        type: str
+        default: "2"
+
+      pg_backup_cron_day:
+        description: "Backup schedule: day."
+        type: str
+        default: "*"
+
+      pg_backup_cron_month:
+        description: "Backup schedule: month."
+        type: str
+        default: "*"
+
+      pg_backup_cron_weekday:
+        description: "Backup schedule: weekday."
+        type: str
+        default: "*"
+
+      pg_backup_cron_log_file:
+        description: "Additional cron job log redirection file."
+        type: str
+
+      # Timeout Settings
+      pg_backup_lock_wait_timeout:
+        description: "Maximum time to wait for table locks during backup (seconds)."
+        type: int
+        default: 300
+
+      pg_backup_connection_timeout:
+        description: "Connection timeout for initial PostgreSQL connection check (seconds)."
+        type: int
+        default: 30
+
+      # Logrotate Configuration
+      pg_backup_configure_logrotate:
+        description: "Enable logrotate configuration for backup logs."
+        type: bool
+        default: true
+
+      pg_backup_logrotate_options:
+        description: "Logrotate configuration options."
+        type: dict

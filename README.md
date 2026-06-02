@@ -51,6 +51,8 @@ The role sets up a complete backup solution:
 | Debian | 12 (Bookworm) | ![✓](https://img.shields.io/badge/✓-brightgreen.svg) |
 | Debian | 11 (Bullseye) | ![✓](https://img.shields.io/badge/✓-brightgreen.svg) |
 
+> **Note**: EL (RHEL, Rocky, Alma, Oracle) is not currently supported by this role.
+
 ### Ansible version
 
 Ansible >= 2.14
@@ -366,7 +368,7 @@ ansible-role-pg-backup/
 - `logrotate` - Logrotate configuration
 - `cron` - Cron job setup
 
-## Example Playbook
+## Example Playbooks
 
 ```yaml
 ---
@@ -438,7 +440,7 @@ Automated via [Release Please](https://github.com/googleapis/release-please):
 2. Merge Release PR → creates Git tag + GitHub Release
 3. Galaxy publish triggers automatically on release using centralized action
 
-## Contributing
+## 🤝 Contributing
 
 Contributions, bug reports, and feature requests are welcome!
 
