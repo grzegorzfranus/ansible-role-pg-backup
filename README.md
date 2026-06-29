@@ -1,8 +1,8 @@
 # Ansible Role: PostgreSQL Backup
 
 |Source|Version|CI|License|
-|------|-------|-------|-------|
-|[![Source Code](https://img.shields.io/badge/source-github-blue.svg)](https://github.com/grzegorzfranus/ansible-role-pg-backup)|[![Version](https://img.shields.io/github/v/release/grzegorzfranus/ansible-role-pg-backup)](https://github.com/grzegorzfranus/ansible-role-pg-backup/releases)|[![tests](https://github.com/grzegorzfranus/ansible-role-pg-backup/actions/workflows/ci.yml/badge.svg)](https://github.com/grzegorzfranus/ansible-role-pg-backup/actions)|[![Repository License](https://img.shields.io/badge/license-apache2.0-brightgreen.svg)](LICENSE)|
+|------|-------|--|-------|
+|[![Source Code](https://img.shields.io/badge/source-github-blue.svg)](https://github.com/grzegorzfranus/ansible-role-pg-backup)|[![Version](https://img.shields.io/github/v/release/grzegorzfranus/ansible-role-pg-backup)](https://github.com/grzegorzfranus/ansible-role-pg-backup/releases)|[![CI](https://github.com/grzegorzfranus/ansible-role-pg-backup/actions/workflows/ci.yml/badge.svg)](https://github.com/grzegorzfranus/ansible-role-pg-backup/actions/workflows/ci.yml)|[![Repository License](https://img.shields.io/badge/license-apache2.0-brightgreen.svg)](LICENSE)|
 
 Professional Ansible role for automated PostgreSQL database backups with comprehensive logging, retention management, and cron scheduling.
 
@@ -38,14 +38,15 @@ The role sets up a complete backup solution:
 
 ## 📋 Requirements
 
-- **Ansible**: 2.14 or higher
+- **Ansible**: 2.15 or higher
 - **PostgreSQL**: Server running and accessible
 - **Privileges**: sudo/root access on target hosts for package installation and cron setup
 
 ### Supported operating systems
+List of officially supported operating systems for this role:
 
 | OS Family | Version | Status |
-|-----------|---------|--------|
+|-----------|---------|---------|
 | Ubuntu | 24.04 (Noble) | ![✓](https://img.shields.io/badge/✓-brightgreen.svg) |
 | Ubuntu | 22.04 (Jammy) | ![✓](https://img.shields.io/badge/✓-brightgreen.svg) |
 | Debian | 12 (Bookworm) | ![✓](https://img.shields.io/badge/✓-brightgreen.svg) |
@@ -55,23 +56,29 @@ The role sets up a complete backup solution:
 
 ### Ansible version
 
-Ansible >= 2.14
+Ansible >= 2.15
 
 ### Python version
 
-Python >= 3.8
+Python >= 3.9
+
+### Setup module
+The role uses facts gathered by Ansible on the remote host. If you disable the Setup module in your playbook, the role will not work properly.
+
+### Root access
+This role requires root access for package installation and cron configuration. Make sure you are using a user with root privileges.
 
 ## 🚀 Quick Start
 
-### 1. Minimal Playbook
+### 1. Basic Backup Setup
 
 ```yaml
 ---
-- name: Configure PostgreSQL backup
+- name: Configure PostgreSQL Backup
   hosts: database_servers
   become: true
   roles:
-    - role: grzegorzfranus.ansible_role_pg_backup
+    - role: grzegorzfranus.pg_backup
       vars:
         pg_backup_pg_password: "{{ vault_pg_backup_password }}"
 ```
@@ -79,7 +86,7 @@ Python >= 3.8
 ### 2. Run the playbook
 
 ```bash
-ansible-playbook -i inventory playbook.yml --ask-vault-pass
+ansible-playbook -i inventory backup-setup.yml --ask-vault-pass
 ```
 
 ## ⚙️ Configuration
@@ -132,7 +139,7 @@ Customize for specific requirements:
     # Timeout safety
     pg_backup_lock_wait_timeout: 600
   roles:
-    - role: grzegorzfranus.ansible_role_pg_backup
+    - role: grzegorzfranus.pg_backup
 ```
 
 ## 📊 Variables
@@ -141,7 +148,7 @@ Customize for specific requirements:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `pg_backup_role_action` | Define which parts of the role to execute (Options: 'all', 'install', 'configure') | `"all"` |
+| `pg_backup_role_action` | Define which parts of the role to execute (Options: `all`, `prerequisites`, `install`, `configure`) | `"all"` |
 | `pg_backup_cron_enabled` | Enable automated cron backups | `true` |
 | `pg_backup_user` | User that will run the backup script | `"postgres"` |
 | `pg_backup_group` | Group for backup files and directories | `"postgres"` |
@@ -204,12 +211,12 @@ Customize for specific requirements:
 | `pg_backup_lock_wait_timeout` | Max seconds to wait for table locks (prevents hangs) | `300` |
 | `pg_backup_connection_timeout` | Connection check timeout in seconds | `30` |
 
-### Logrotate Configuration
+### Logrotate Options
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `pg_backup_configure_logrotate` | Enable logrotate configuration | `true` |
-| `pg_backup_logrotate_options` | Dictionary of logrotate settings | See below |
+| `pg_backup_logrotate_options` | Dictionary of logrotate settings | *See defaults/main.yml* |
 | `pg_backup_logrotate_options.frequency` | Rotation frequency | `"daily"` |
 | `pg_backup_logrotate_options.count` | Number of rotated logs to keep | `14` |
 | `pg_backup_logrotate_options.compress` | Compress rotated logs | `true` |
@@ -258,7 +265,8 @@ ls -la /var/backups/postgresql/
 
 ## 🔄 Restore Procedures
 
-> ⚠️ **IMPORTANT**: Always restore global objects (roles/users) BEFORE restoring databases!
+> [!WARNING]
+> **IMPORTANT**: Always restore global objects (roles/users) BEFORE restoring databases!
 > Otherwise, database ownership and permissions will fail because the roles don't exist yet.
 
 ### Step 1: Restore Global Objects (REQUIRED FIRST)
@@ -297,6 +305,29 @@ pg_restore -h localhost -U postgres -d database_name -j 4 -v backup_file.dump
 - ✅ **Script Security**: Backup script is executable only by owner/group (`0750`)
 - ✅ **Vault Integration**: Designed to work with Ansible Vault for password protection
 
+## 🔒 Security considerations
+
+- Keep the PostgreSQL password secure. Always use Ansible Vault for the `pg_backup_pg_password` variable.
+- Verify that permissions of `pg_backup_dir` are kept restricted to avoid unauthorized access to database backups.
+
+## 🧪 Check mode behavior
+
+- Configuration template tests and directory validations run normally in Check Mode.
+- Mutating commands (such as postgresql-client package installation, script deployment, and cron setup) are safely skipped.
+
+## 🏷️ Tags usage
+
+- Use `--tags` to run selective parts of the role: `always`, `validate`, `setup`, `init`, `prerequisites`, `install`, `configure`.
+
+## 🌐 Network resilience
+
+- The role can configure backups for both local and remote PostgreSQL servers.
+- Ensure that firewalls are configured to allow outgoing connections to the remote host if `pg_backup_pg_host` is not set to `localhost`.
+
+## 🧰 Repository management
+
+- This role relies on default OS package repositories to install the PostgreSQL client packages. It does not configure custom upstream repository sources directly.
+
 ## 🔧 Troubleshooting
 
 ### Common Issues
@@ -325,48 +356,62 @@ tail -f /var/log/postgresql/pg_backup.log
 
 ```
 ansible-role-pg-backup/
-├── .github/                  # GitHub Actions workflows
-│   └── workflows/
-│       ├── ci.yml            # Centralized CI workflow
-│       └── release.yml       # Release Please & Galaxy publishing
-├── .release-please-manifest.json # Release Please manifest
-├── CHANGELOG.md              # Version history
-├── LICENSE                   # Apache-2.0 license
-├── README.md                 # This documentation
-├── release-please-config.json # Release Please configuration
+├── .github/                           # GitHub configuration files
+│   ├── ISSUE_TEMPLATE/                # Issue templates for bug, feature, task
+│   │   ├── bug_report.yml
+│   │   ├── config.yml
+│   │   ├── feature_request.yml
+│   │   └── task.yml
+│   ├── PULL_REQUEST_TEMPLATE/         # Pull request description template
+│   │   └── pull_request_template.md
+│   ├── workflows/
+│   │   ├── ci.yml                     # CI pipeline
+│   │   └── release.yml                # Release Please & Galaxy publishing
+│   └── dependabot.yml                 # Dependabot configuration for GitHub Actions
+├── .release-please-manifest.json      # Release Please manifest
+├── CHANGELOG.md                       # Version history
+├── LICENSE                            # Apache-2.0 license
+├── README.md                          # This documentation
+├── release-please-config.json         # Release Please configuration
 ├── defaults/
-│   └── main.yml              # Default variables
+│   └── main.yml                       # Default configuration variables
 ├── handlers/
-│   └── main.yml              # Service handlers
+│   └── main.yml                       # Service restart and reload handlers
 ├── meta/
-│   └── main.yml              # Role metadata
+│   ├── main.yml                       # Role metadata and Galaxy information
+│   └── argument_specs.yml             # Native argument specification validation
+├── molecule/                          # Molecule testing framework
+│   └── default/                       # Default testing scenario
 ├── tasks/
-│   ├── main.yml              # Main orchestration
-│   ├── assert.yml            # Variable validation
-│   ├── prerequisites.yml     # Package installation
-│   ├── install.yml           # Script deployment
-│   ├── configure.yml         # Configuration setup
-│   ├── logrotate.yml         # Log rotation config
-│   └── cron.yml              # Cron job setup
+│   ├── main.yml                       # Main task orchestration
+│   ├── assert.yml                     # Variable validation and system compatibility
+│   ├── prerequisites.yml              # System preparation and package installation
+│   ├── install.yml                    # Script deployment tasks
+│   ├── configure.yml                  # PostgreSQL settings and .pgpass config
+│   ├── logrotate.yml                  # Logrotate setup
+│   └── cron.yml                       # Cron job scheduler setup
 ├── templates/
 │   ├── logrotate/
-│   │   └── pg_backup.j2      # Logrotate template
+│   │   └── pg_backup.j2               # Logrotate configuration template
 │   ├── scripts/
-│   │   └── pg_backup.sh.j2   # Backup script template
-│   └── pgpass.j2             # .pgpass template
+│   │   └── pg_backup.sh.j2            # PostgreSQL backup bash script template
+│   └── pgpass.j2                      # PostgreSQL password file template
 └── vars/
-    └── main.yml              # Internal variables
+    └── main.yml                       # Internal variables
 ```
 
 ## 🏷️ Tags
 
-- `always` - Validation tasks
-- `setup` - Initial setup
-- `prerequisites` - Package installation
-- `install` - Script installation
-- `configure` - Configuration tasks
-- `logrotate` - Logrotate configuration
-- `cron` - Cron job setup
+| Tag | Description |
+|-----|-------------|
+| `always` | Tasks that always run (variable loading and validation) |
+| `validate` / `check` | Variable validation and system compatibility tasks |
+| `setup` / `init` | OS-specific variable gathering tasks |
+| `prerequisites` / `requirements` | Verification and setup of required packages |
+| `install` | Backup script deployment tasks |
+| `configure` / `config` | PostgreSQL connection and configuration tasks |
+| `logrotate` | Log rotation configuration tasks |
+| `cron` | Cron job scheduler configuration tasks |
 
 ## Example Playbooks
 
@@ -375,87 +420,43 @@ ansible-role-pg-backup/
 - name: Configure PostgreSQL Backup
   hosts: database_servers
   become: true
-  
-  vars:
-    # Security
-    pg_backup_pg_password: "{{ vault_pg_backup_password }}"
-    
-    # Retention
-    pg_backup_retention_days: 14
-    
-    # Schedule (3:00 AM)
-    pg_backup_cron_hour: "3"
-    
-    # Log Rotation
-    pg_backup_logrotate_options:
-      frequency: "daily"
-      count: 30
-      compress: true
-      delaycompress: true
-      missingok: true
-      notifempty: true
-      create: true
-      create_mode: "0640"
-      create_owner: "postgres"
-      create_group: "postgres"
-      dateext: true
-      archive_directory_path: "/var/log/postgresql/archived"
-
   roles:
     - role: grzegorzfranus.pg_backup
+      vars:
+        # Security
+        pg_backup_pg_password: "{{ vault_pg_backup_password }}"
+        
+        # Retention
+        pg_backup_retention_days: 14
+        
+        # Schedule (3:00 AM)
+        pg_backup_cron_hour: "3"
+        
+        # Log Rotation
+        pg_backup_logrotate_options:
+          frequency: "daily"
+          count: 30
+          compress: true
+          delaycompress: true
+          missingok: true
+          notifempty: true
+          create: true
+          create_mode: "0640"
+          create_owner: "postgres"
+          create_group: "postgres"
+          dateext: true
+          archive_directory_path: "/var/log/postgresql/archived"
 ```
-
-## 🧪 Testing
-
-This role includes comprehensive Molecule tests that validate functionality across supported operating systems.
-
-### Running Tests Locally
-
-```bash
-# Install testing dependencies
-pip install molecule molecule-plugins[docker] ansible-lint
-
-# Run all tests
-molecule test
-```
-
-## CI/CD Pipeline
-
-### CI Pipeline
-
-Runs on every Pull Request via centralized reusable workflow:
-
-1. **Branch Name Lint** — enforces naming conventions (`feature/`, `bugfix/`, etc.)
-2. **YAML Lint** — validates all YAML files
-3. **Ansible Lint** — enforces best practices and guidelines compliance (production profile)
-4. **Security Scan** — TruffleHog secret detection
-5. **Molecule Tests** — matrix across Debian 11/12 and Ubuntu 22.04/24.04
-6. **Merge Check** — aggregated status check for branch protection
-
-### Release & Publish
-
-Automated via [Release Please](https://github.com/googleapis/release-please):
-
-1. Merge to `main` → Release Please creates a Release PR with changelog
-2. Merge Release PR → creates Git tag + GitHub Release
-3. Galaxy publish triggers automatically on release using centralized action
 
 ## 🤝 Contributing
 
 Contributions, bug reports, and feature requests are welcome!
 
 - Fork the repository and create your branch from `main`
-- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages:
-  - `feat:` — new features (minor version bump)
-  - `fix:` — bug fixes (patch version bump)
-  - `docs:` — documentation changes
-  - `refactor:` — code refactoring
-  - `test:` — test additions
-  - `ci:` — CI/CD changes
-  - `chore:` — maintenance tasks
-- Use branch naming convention: `feature/`, `bugfix/`, `hotfix/`, `docs/`, `refactor/`, `test/`, `chore/`, `ci/`
+- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages
 - Ensure your code passes all CI checks (YAML lint, Ansible lint, Molecule tests)
-- Submit a pull request describing your changes
+- Submit a pull request describing your changes (a template is available under `.github/PULL_REQUEST_TEMPLATE/pull_request_template.md` to help structure your PR description)
+- For major changes, please open an issue first to discuss what you would like to change (issue templates for bug reports, feature requests, and tasks are available under `.github/ISSUE_TEMPLATE/`)
 
 ## 📝 License
 
